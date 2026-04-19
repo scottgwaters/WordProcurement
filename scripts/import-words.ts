@@ -49,7 +49,7 @@ async function main() {
   // Path to the iOS app's word file
   const wordFilePath = path.join(
     __dirname,
-    "../../Wordnauts/Wordnauts/Resources/answer_words.json"
+    "../../../Wordnauts/Wordnauts/Resources/answer_words.json"
   );
 
   if (!fs.existsSync(wordFilePath)) {
