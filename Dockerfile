@@ -13,9 +13,12 @@ COPY . .
 ENV DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
 RUN npm run build
 
+COPY start.sh ./
+RUN chmod +x start.sh
+
 ENV NODE_ENV=production
 ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["./start.sh"]
