@@ -10,7 +10,8 @@ RUN npm ci
 
 COPY . .
 
-ENV DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
+# Use ARG for build-time only (won't persist to runtime)
+ARG DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
 RUN npm run build
 
 COPY start.sh ./
