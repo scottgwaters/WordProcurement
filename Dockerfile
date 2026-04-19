@@ -10,9 +10,8 @@ RUN npm ci
 
 COPY . .
 
-# Use ARG for build-time only (won't persist to runtime)
-ARG DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
-RUN npm run build
+# Set DATABASE_URL only for the build command (inline)
+RUN DATABASE_URL="mysql://build:build@localhost:3306/build" npm run build
 
 COPY start.sh ./
 RUN chmod +x start.sh
