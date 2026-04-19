@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 interface WordEntry {
   id: string;
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
                 level: w.level,
                 category: w.category,
                 wordLength: w.word_length,
-                hints: w.hints || null,
+                hints: w.hints ? (w.hints as Prisma.InputJsonValue) : Prisma.JsonNull,
                 pronunciation: w.pronunciation || null,
                 partOfSpeech: w.part_of_speech || null,
                 definition: w.definition || null,
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
                 level: w.level,
                 category: w.category,
                 wordLength: w.word_length,
-                hints: w.hints || null,
+                hints: w.hints ? (w.hints as Prisma.InputJsonValue) : Prisma.JsonNull,
                 pronunciation: w.pronunciation || null,
                 partOfSpeech: w.part_of_speech || null,
                 definition: w.definition || null,
