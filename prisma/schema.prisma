@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  words         Word[]        @relation("CreatedBy")
+  verifiedWords Word[]        @relation("VerifiedBy")
+  activityLogs  ActivityLog[]
+
+  @@map("users")
+}
+
+model Word {
+  id                   String    @id @default(cuid())
+  word                 String
+  ageGroup             String    @map("age_group")
+  level                Int
+  category             String
+  wordLength           Int       @map("word_length")
+  hints                Json?
+  pronunciation        String?
+  partOfSpeech         String?   @map("part_of_speech")
+  definition           String?   @db.Text
+  exampleSentence      String?   @map("example_sentence") @db.Text
+  heartWordExplanation String?   @map("heart_word_explanation") @db.Text
+  verified             Boolean   @default(false)
+  verifiedAt           DateTime? @map("verified_at")
+  verifiedById         String?   @map("verified_by")
+  verifiedBy           User?     @relation("VerifiedBy", fields: [verifiedById], references: [id])
+  createdAt            DateTime  @default(now()) @map("created_at")
+  createdById          String?   @map("created_by")
+  createdBy            User?     @relation("CreatedBy", fields: [createdById], references: [id])
+  source               String?
+
+  activityLogs ActivityLog[]
+
+  @@index([category])
+  @@index([ageGroup])
+  @@index([verified])
+  @@map("words")
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  wordId    String   @map("word_id")
+  word      Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([wordId])
+  @@index([userId])
+  @@map("activity_log")
+}

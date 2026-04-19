@@ -4,23 +4,35 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && (prisma db push --skip-generate || echo 'DB push skipped - DATABASE_URL not accessible') && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "import-words": "tsx scripts/import-words.ts",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
+    "@prisma/client": "^6.6.0",
+    "bcryptjs": "^3.0.2",
     "next": "16.2.4",
+    "next-auth": "^5.0.0-beta.28",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "prisma": "^6.6.0",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

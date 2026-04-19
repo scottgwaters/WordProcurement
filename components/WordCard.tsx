@@ -1,0 +1,115 @@
+"use client";
+
+import type { Word } from "@/lib/types";
+import Link from "next/link";
+
+interface WordCardProps {
+  word: Word;
+  showActions?: boolean;
+  onVerify?: (wordId: string) => void;
+  onReject?: (wordId: string) => void;
+  onSkip?: () => void;
+  isLoading?: boolean;
+}
+
+export default function WordCard({
+  word,
+  showActions = false,
+  onVerify,
+  onReject,
+  onSkip,
+  isLoading = false,
+}: WordCardProps) {
+  return (
+    <div className="card p-6 transition-normal">
+      {/* Word header */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <Link
+            href={`/words/${word.id}`}
+            className="word-display hover:text-[var(--accent)] transition-fast"
+          >
+            {word.word}
+          </Link>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="badge badge-neutral">{word.category}</span>
+            <span className="badge badge-neutral">Ages {word.age_group}</span>
+            <span className="badge badge-neutral">Level {word.level}</span>
+          </div>
+        </div>
+        <div>
+          {word.verified ? (
+            <span className="badge badge-success">Verified</span>
+          ) : (
+            <span className="badge badge-warning">Pending</span>
+          )}
+        </div>
+      </div>
+
+      {/* Hints */}
+      {word.hints && (
+        <div className="space-y-2 mb-4">
+          <div className="text-sm">
+            <span className="font-medium text-[var(--text-secondary)]">Easy: </span>
+            <span className="text-[var(--text-primary)]">{word.hints.easy}</span>
+          </div>
+          <div className="text-sm">
+            <span className="font-medium text-[var(--text-secondary)]">Medium: </span>
+            <span className="text-[var(--text-primary)]">{word.hints.medium}</span>
+          </div>
+          <div className="text-sm">
+            <span className="font-medium text-[var(--text-secondary)]">Hard: </span>
+            <span className="text-[var(--text-primary)]">{word.hints.hard}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Educational metadata */}
+      {(word.definition || word.example_sentence) && (
+        <div className="border-t border-[var(--border-light)] pt-4 mt-4 space-y-2">
+          {word.definition && (
+            <div className="text-sm">
+              <span className="font-medium text-[var(--text-secondary)]">Definition: </span>
+              <span className="text-[var(--text-primary)]">{word.definition}</span>
+            </div>
+          )}
+          {word.example_sentence && (
+            <div className="text-sm">
+              <span className="font-medium text-[var(--text-secondary)]">Example: </span>
+              <span className="text-[var(--text-primary)] italic">
+                &ldquo;{word.example_sentence}&rdquo;
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      {showActions && (
+        <div className="flex items-center gap-3 mt-6 pt-4 border-t border-[var(--border-light)]">
+          <button
+            onClick={() => onVerify?.(word.id)}
+            disabled={isLoading}
+            className="btn btn-success flex-1"
+          >
+            {isLoading ? <span className="spinner" /> : "Approve"}
+          </button>
+          <button
+            onClick={() => onReject?.(word.id)}
+            disabled={isLoading}
+            className="btn btn-danger flex-1"
+          >
+            Reject
+          </button>
+          <button
+            onClick={onSkip}
+            disabled={isLoading}
+            className="btn btn-secondary"
+          >
+            Skip
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
