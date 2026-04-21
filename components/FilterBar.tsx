@@ -1,6 +1,7 @@
 "use client";
 
-import { CATEGORIES, type AgeGroup, type Level, type WordFilters } from "@/lib/types";
+import { useEffect, useState } from "react";
+import type { AgeGroup, Level, WordFilters } from "@/lib/types";
 
 interface FilterBarProps {
   filters: WordFilters;
@@ -8,8 +9,20 @@ interface FilterBarProps {
 }
 
 export default function FilterBar({ filters, onChange }: FilterBarProps) {
+  const [categories, setCategories] = useState<string[]>([]);
   const ageGroups: AgeGroup[] = ["4-6", "7-9", "10-12"];
   const levels: Level[] = [1, 2, 3];
+
+  useEffect(() => {
+    async function fetchCategories() {
+      const response = await fetch("/api/words/categories");
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data.categories || []);
+      }
+    }
+    fetchCategories();
+  }, []);
 
   return (
     <div className="card p-4">
@@ -34,7 +47,7 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
           className="input w-auto"
         >
           <option value="">All categories</option>
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <option key={cat} value={cat}>
               {cat.replace(/_/g, " ")}
             </option>
