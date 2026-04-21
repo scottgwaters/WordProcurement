@@ -25,9 +25,15 @@ interface WordEntry {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const expectedToken = process.env.IMPORT_API_TOKEN;
+  const tokenOk = !!expectedToken && !!bearer && bearer === expectedToken;
+
+  if (!tokenOk) {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   try {
