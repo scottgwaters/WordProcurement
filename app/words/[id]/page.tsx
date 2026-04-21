@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, use } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import HintGenerator from "@/components/HintGenerator";
-import type { Word, GeneratedHints, AgeGroup, Level } from "@/lib/types";
+import type { Word, GeneratedHints, AgeGroup, Level, ActivityLogWithUser } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/types";
@@ -20,6 +20,8 @@ export default function WordDetailPage({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [activity, setActivity] = useState<ActivityLogWithUser[]>([]);
+  const [activityExpanded, setActivityExpanded] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -35,10 +37,19 @@ export default function WordDetailPage({
     part_of_speech: "",
     pronunciation: "",
     heart_word_explanation: "",
+    source: "",
   });
 
   const router = useRouter();
   const { status } = useSession();
+
+  const fetchActivity = useCallback(async () => {
+    const response = await fetch(`/api/words/${resolvedParams.id}/activity`);
+    if (response.ok) {
+      const data = await response.json();
+      setActivity(data);
+    }
+  }, [resolvedParams.id]);
 
   const fetchWord = useCallback(async () => {
     if (status !== "authenticated") return;
@@ -68,10 +79,12 @@ export default function WordDetailPage({
       part_of_speech: data.part_of_speech || "",
       pronunciation: data.pronunciation || "",
       heart_word_explanation: data.heart_word_explanation || "",
+      source: data.source || "",
     });
 
     setIsLoading(false);
-  }, [status, resolvedParams.id]);
+    fetchActivity();
+  }, [status, resolvedParams.id, fetchActivity]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -101,6 +114,7 @@ export default function WordDetailPage({
       part_of_speech: formData.part_of_speech || null,
       pronunciation: formData.pronunciation || null,
       heart_word_explanation: formData.heart_word_explanation || null,
+      source: formData.source || null,
     };
 
     const response = await fetch(`/api/words/${resolvedParams.id}`, {
@@ -304,6 +318,20 @@ export default function WordDetailPage({
                   </select>
                 </div>
               </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                  Source
+                </label>
+                <input
+                  type="text"
+                  value={formData.source}
+                  onChange={(e) =>
+                    setFormData({ ...formData, source: e.target.value })
+                  }
+                  className="input"
+                  placeholder="Where this word came from (e.g., Dolch list, Fry words)"
+                />
+              </div>
             </div>
 
             {/* Hints */}
@@ -454,6 +482,82 @@ export default function WordDetailPage({
                 "Save Changes"
               )}
             </button>
+
+            {/* Activity History */}
+            <div className="card">
+              <button
+                onClick={() => setActivityExpanded(!activityExpanded)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-[var(--bg-secondary)] transition-colors"
+              >
+                <h2 className="text-lg font-semibold">
+                  Activity History ({activity.length})
+                </h2>
+                <span className="text-[var(--text-secondary)]">
+                  {activityExpanded ? "▲" : "▼"}
+                </span>
+              </button>
+              {activityExpanded && (
+                <div className="border-t border-[var(--border-light)]">
+                  {activity.length === 0 ? (
+                    <p className="p-4 text-sm text-[var(--text-secondary)]">
+                      No activity recorded yet.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-[var(--border-light)]">
+                      {activity.map((entry) => (
+                        <div key={entry.id} className="p-4">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span
+                              className={`badge ${
+                                entry.action === "verified"
+                                  ? "badge-success"
+                                  : entry.action === "rejected"
+                                    ? "badge-error"
+                                    : entry.action === "created"
+                                      ? "badge-info"
+                                      : "badge-neutral"
+                              }`}
+                            >
+                              {entry.action}
+                            </span>
+                            <span className="text-sm text-[var(--text-secondary)]">
+                              {entry.user_email || "Unknown user"}
+                            </span>
+                            <span className="text-xs text-[var(--text-secondary)] ml-auto">
+                              {new Date(entry.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          {entry.details && (entry.details as { changes?: Record<string, { old: unknown; new: unknown }> }).changes && (
+                            <div className="mt-2 text-sm bg-[var(--bg-secondary)] rounded p-3 space-y-1">
+                              {Object.entries((entry.details as { changes: Record<string, { old: unknown; new: unknown }> }).changes).map(
+                                ([field, change]) => (
+                                  <div key={field} className="flex flex-wrap gap-2">
+                                    <span className="font-medium text-[var(--text-primary)]">
+                                      {field.replace(/_/g, " ")}:
+                                    </span>
+                                    <span className="text-[var(--error)] line-through">
+                                      {typeof change.old === "object"
+                                        ? JSON.stringify(change.old)
+                                        : String(change.old || "(empty)")}
+                                    </span>
+                                    <span className="text-[var(--text-secondary)]">→</span>
+                                    <span className="text-[var(--success)]">
+                                      {typeof change.new === "object"
+                                        ? JSON.stringify(change.new)
+                                        : String(change.new || "(empty)")}
+                                    </span>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* AI Hint Generator sidebar */}

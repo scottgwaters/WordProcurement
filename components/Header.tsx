@@ -16,6 +16,7 @@ export default function Header() {
     { href: "/", label: "Dashboard" },
     { href: "/review", label: "Review" },
     { href: "/words", label: "Words" },
+    { href: "/activity", label: "Activity" },
   ];
 
   return (

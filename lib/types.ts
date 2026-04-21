@@ -41,6 +41,22 @@ export interface ActivityLog {
   created_at: string;
 }
 
+// Activity change tracking for audit history
+export interface ActivityChange {
+  old: unknown;
+  new: unknown;
+}
+
+export interface ActivityChanges {
+  [field: string]: ActivityChange;
+}
+
+// Activity log with user info for display
+export interface ActivityLogWithUser extends ActivityLog {
+  user_email: string | null;
+  words?: { word: string } | null;
+}
+
 export interface User {
   id: string;
   email: string;

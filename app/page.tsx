@@ -26,6 +26,9 @@ export default async function Dashboard() {
         word: {
           select: { word: true },
         },
+        user: {
+          select: { email: true },
+        },
       },
     }),
   ]);
@@ -139,9 +142,14 @@ export default async function Dashboard() {
                     <span className="text-sm font-medium">
                       {activity.word?.word || "Unknown"}
                     </span>
-                    <span className="text-xs text-[var(--text-secondary)] ml-auto">
-                      {new Date(activity.createdAt).toLocaleDateString()}
-                    </span>
+                    <div className="ml-auto text-right">
+                      <span className="text-xs text-[var(--text-secondary)] block">
+                        {activity.user?.email?.split("@")[0] || "Unknown"}
+                      </span>
+                      <span className="text-xs text-[var(--text-secondary)]">
+                        {new Date(activity.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
