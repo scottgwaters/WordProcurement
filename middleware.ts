@@ -18,7 +18,6 @@ export default auth((req) => {
   if (isImportApi) {
     const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     const expected = process.env.IMPORT_API_TOKEN;
-    console.log(`[middleware] /api/import bearer_present=${!!bearer} expected_present=${!!expected} match=${!!bearer && bearer === expected} bearer_len=${bearer?.length ?? 0} expected_len=${expected?.length ?? 0}`);
     if (bearer && expected && bearer === expected) {
       return NextResponse.next();
     }
