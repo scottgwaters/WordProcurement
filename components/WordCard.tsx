@@ -8,6 +8,7 @@ interface WordCardProps {
   showActions?: boolean;
   onVerify?: (wordId: string) => void;
   onReject?: (wordId: string) => void;
+  onEdit?: (wordId: string) => void;
   onSkip?: () => void;
   isLoading?: boolean;
 }
@@ -17,6 +18,7 @@ export default function WordCard({
   showActions = false,
   onVerify,
   onReject,
+  onEdit,
   onSkip,
   isLoading = false,
 }: WordCardProps) {
@@ -100,6 +102,13 @@ export default function WordCard({
             className="btn btn-danger flex-1"
           >
             Reject
+          </button>
+          <button
+            onClick={() => onEdit?.(word.id)}
+            disabled={isLoading}
+            className="btn btn-secondary"
+          >
+            Edit
           </button>
           <button
             onClick={onSkip}

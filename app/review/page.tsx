@@ -106,6 +106,10 @@ export default function ReviewPage() {
     }
   };
 
+  const handleEdit = (wordId: string) => {
+    router.push(`/words/${wordId}`);
+  };
+
   const currentWord = words[currentIndex];
 
   if (status === "loading") {
@@ -203,6 +207,7 @@ export default function ReviewPage() {
                   showActions
                   onVerify={handleVerify}
                   onReject={handleReject}
+                  onEdit={handleEdit}
                   onSkip={handleSkip}
                   isLoading={isActing}
                 />
