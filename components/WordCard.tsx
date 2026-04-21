@@ -1,6 +1,7 @@
 "use client";
 
 import type { Word } from "@/lib/types";
+import { worldForCategory } from "@/lib/worlds";
 import Link from "next/link";
 
 interface WordCardProps {
@@ -22,6 +23,7 @@ export default function WordCard({
   onSkip,
   isLoading = false,
 }: WordCardProps) {
+  const assignment = worldForCategory(word.category);
   return (
     <div className="card p-6 transition-normal">
       {/* Word header */}
@@ -33,11 +35,31 @@ export default function WordCard({
           >
             {word.word}
           </Link>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex flex-wrap items-center gap-2 mt-2">
             <span className="badge badge-neutral">{word.category}</span>
             <span className="badge badge-neutral">Ages {word.age_group}</span>
             <span className="badge badge-neutral">Level {word.level}</span>
+            {assignment.world ? (
+              <span
+                className="badge badge-neutral"
+                title={assignment.world.tagline}
+              >
+                {assignment.world.emoji} {assignment.world.name}
+              </span>
+            ) : (
+              <span
+                className="badge badge-warning"
+                title={assignment.note}
+              >
+                ⚠ World: Mixed
+              </span>
+            )}
           </div>
+          {assignment.ambiguous && (
+            <p className="text-xs text-[var(--text-secondary)] mt-2 max-w-xl">
+              {assignment.note}
+            </p>
+          )}
         </div>
         <div>
           {word.verified ? (

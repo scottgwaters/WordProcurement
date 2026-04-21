@@ -8,6 +8,7 @@ import type { Word, GeneratedHints, AgeGroup, Level, ActivityLogWithUser } from 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/types";
+import { worldForCategory } from "@/lib/worlds";
 
 export default function WordDetailPage({
   params,
@@ -225,6 +226,16 @@ export default function WordDetailPage({
               <span className="text-sm text-[var(--text-secondary)]">
                 {word.category.replace(/_/g, " ")}
               </span>
+              {(() => {
+                const a = worldForCategory(word.category);
+                return a.world ? (
+                  <span className="badge badge-neutral" title={a.world.tagline}>
+                    {a.world.emoji} {a.world.name}
+                  </span>
+                ) : (
+                  <span className="badge badge-warning" title={a.note}>⚠ World: Mixed</span>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -278,6 +289,16 @@ export default function WordDetailPage({
                       </option>
                     ))}
                   </select>
+                  {(() => {
+                    const a = worldForCategory(formData.category);
+                    return (
+                      <p className={`text-xs mt-1 ${a.ambiguous ? "text-[var(--warning)]" : "text-[var(--text-secondary)]"}`}>
+                        {a.world
+                          ? `In-game world: ${a.world.emoji} ${a.world.name} — ${a.world.tagline}`
+                          : `⚠ ${a.note}`}
+                      </p>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
