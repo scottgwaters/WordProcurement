@@ -7,10 +7,19 @@ export default auth((req) => {
   const isSetupPage = req.nextUrl.pathname === "/setup";
   const isAuthApi = req.nextUrl.pathname.startsWith("/api/auth");
   const isSetupApi = req.nextUrl.pathname === "/api/setup";
+  const isImportApi = req.nextUrl.pathname === "/api/import";
 
   // Allow auth and setup API routes
   if (isAuthApi || isSetupApi) {
     return NextResponse.next();
+  }
+
+  // Allow /api/import when it carries a valid bearer token (defense-in-depth alongside route handler check)
+  if (isImportApi) {
+    const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (bearer && bearer === process.env.IMPORT_API_TOKEN) {
+      return NextResponse.next();
+    }
   }
 
   // Allow setup page (it checks internally if setup is needed)
