@@ -32,19 +32,29 @@ export default function Header() {
 
           {/* Navigation */}
           <nav className="flex items-center gap-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === item.href
-                    ? "bg-[var(--bg-secondary)] text-[var(--text-primary)]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? "text-[var(--text-primary)] font-semibold"
+                      : "text-[var(--text-secondary)] font-normal hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {item.label}
+                  {active && (
+                    <span
+                      aria-hidden
+                      className="absolute left-3 right-3 -bottom-[17px] h-[2px] bg-[var(--accent)]"
+                    />
+                  )}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* User menu */}
