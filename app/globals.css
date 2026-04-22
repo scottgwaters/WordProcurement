@@ -176,6 +176,18 @@ body {
   background: var(--error-bg);
 }
 
+/* Flag button — active state. Keeps the outlined shape of btn-secondary but
+   tints amber so a flagged word reads as "already flagged" at a glance. */
+.btn-flag-active {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+.btn-flag-active:hover {
+  background: var(--warning);
+  color: #FFFFFF;
+}
+
 /* Ghost — lowest-weight action for passive moves like Skip. */
 .btn-ghost {
   background: transparent;

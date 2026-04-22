@@ -73,14 +73,6 @@ export default function WordCard({
           ) : (
             <span className="badge badge-warning">Pending</span>
           )}
-          {word.flagged && (
-            <span
-              className="badge badge-warning"
-              title="Flagged for another reviewer"
-            >
-              ⚑ Flagged
-            </span>
-          )}
         </div>
       </div>
 
@@ -149,15 +141,38 @@ export default function WordCard({
             <button
               onClick={() => onFlag(word.id)}
               disabled={isLoading}
-              className="btn btn-secondary inline-flex items-center gap-2"
-              aria-label="Flag this word for another reviewer"
-              title="Flag for another reviewer to look at"
+              className={`btn inline-flex items-center gap-2 ${
+                word.flagged
+                  ? "btn-flag-active"
+                  : "btn-secondary"
+              }`}
+              aria-label={
+                word.flagged
+                  ? "Currently flagged — click to un-flag"
+                  : "Flag this word for another reviewer"
+              }
+              aria-pressed={word.flagged ? true : false}
+              title={
+                word.flagged
+                  ? "Currently flagged — click to un-flag"
+                  : "Flag for another reviewer to look at"
+              }
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill={word.flagged ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
                 <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
                 <line x1="4" y1="22" x2="4" y2="15" />
               </svg>
-              Flag
+              {word.flagged ? "Flagged" : "Flag"}
             </button>
           )}
           <div className="flex-1" aria-hidden />

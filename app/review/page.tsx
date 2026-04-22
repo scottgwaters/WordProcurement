@@ -243,6 +243,26 @@ export default function ReviewPage() {
   };
 
   const handleFlag = async (wordId: string) => {
+    const word = words.find((w) => w.id === wordId);
+    const alreadyFlagged = word?.flagged ?? false;
+
+    // Toggle: if the word is already flagged, clicking the (now active)
+    // Flag button un-flags it. Otherwise we prompt for an optional note
+    // and mark it flagged.
+    if (alreadyFlagged) {
+      setIsActing(true);
+      await fetch(`/api/words/${wordId}/flag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagged: false }),
+      });
+      setWords((prev) =>
+        prev.map((w) => (w.id === wordId ? { ...w, flagged: false } : w))
+      );
+      setIsActing(false);
+      return;
+    }
+
     const reason = await dlg.prompt({
       title: "Flag for another reviewer",
       message: "What should they look at? Leave blank if you don't need to say.",
@@ -257,6 +277,10 @@ export default function ReviewPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flagged: true, reason: reason || undefined }),
     });
+    // Reflect flagged state locally so the button shows active immediately.
+    setWords((prev) =>
+      prev.map((w) => (w.id === wordId ? { ...w, flagged: true } : w))
+    );
     // Move past the flagged word to the next one so reviewer can keep moving
     if (currentIndex < words.length - 1) {
       setCurrentIndex((i) => i + 1);
