@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 export default function ReviewPage() {
   const [words, setWords] = useState<Word[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [filters, setFilters] = useState<WordFilters>({ verified: false });
+  const [filters, setFilters] = useState<WordFilters & { world?: string }>({ verified: false });
   const [isLoading, setIsLoading] = useState(true);
   const [isActing, setIsActing] = useState(false);
   const [stats, setStats] = useState({ reviewed: 0, remaining: 0 });
@@ -27,7 +27,8 @@ export default function ReviewPage() {
     const params = new URLSearchParams();
     params.set("verified", "false");
     params.set("pageSize", "50");
-    if (filters.category) params.set("category", filters.category);
+    if (filters.world) params.set("world", filters.world);
+    else if (filters.category) params.set("category", filters.category);
     if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
     if (filters.level) params.set("level", String(filters.level));
     if (filters.search) params.set("search", filters.search);
@@ -107,7 +108,7 @@ export default function ReviewPage() {
   };
 
   const handleEdit = (wordId: string) => {
-    router.push(`/words/${wordId}`);
+    router.push(`/words/${wordId}?from=review`);
   };
 
   const currentWord = words[currentIndex];
@@ -159,6 +160,7 @@ export default function ReviewPage() {
         <FilterBar
           filters={filters}
           onChange={(newFilters) => setFilters({ ...newFilters, verified: false })}
+          showStatus={false}
         />
 
         <div className="mt-6">

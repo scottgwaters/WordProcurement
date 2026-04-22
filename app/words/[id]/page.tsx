@@ -5,10 +5,10 @@ import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import HintGenerator from "@/components/HintGenerator";
 import type { Word, GeneratedHints, AgeGroup, Level, ActivityLogWithUser } from "@/lib/types";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/types";
-import { worldForCategory } from "@/lib/worlds";
+import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 
 export default function WordDetailPage({
   params,
@@ -16,6 +16,10 @@ export default function WordDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = use(params);
+  const searchParams = useSearchParams();
+  const from = searchParams.get("from");
+  const backHref = from === "review" ? "/review" : "/words";
+  const backLabel = from === "review" ? "Back to review" : "Back to words";
   const [word, setWord] = useState<Word | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -192,8 +196,8 @@ export default function WordDetailPage({
         <main className="max-w-4xl mx-auto px-6 py-8">
           <div className="card p-12 text-center">
             <p className="text-[var(--text-secondary)]">Word not found</p>
-            <Link href="/words" className="btn btn-primary mt-4">
-              Back to Words
+            <Link href={backHref} className="btn btn-primary mt-4">
+              {backLabel}
             </Link>
           </div>
         </main>
@@ -208,10 +212,10 @@ export default function WordDetailPage({
       <main className="max-w-4xl mx-auto px-6 py-8">
         <div className="flex items-center gap-4 mb-6">
           <Link
-            href="/words"
+            href={backHref}
             className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
-            ← Back
+            ← {backLabel}
           </Link>
           <div className="flex-1">
             <h1 className="text-3xl font-semibold text-[var(--text-primary)] uppercase tracking-wide">
@@ -274,7 +278,32 @@ export default function WordDetailPage({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                    Category
+                    World
+                  </label>
+                  <select
+                    value={worldForCategory(formData.category).world?.id ?? ""}
+                    onChange={(e) => {
+                      const newWorldId = e.target.value as WorldId;
+                      const defaultCategory = CATEGORIES_BY_WORLD[newWorldId]?.[0];
+                      if (defaultCategory) {
+                        setFormData({ ...formData, category: defaultCategory });
+                      }
+                    }}
+                    className="input"
+                  >
+                    {Object.values(WORLDS).map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.emoji} {w.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs mt-1 text-[var(--text-secondary)]">
+                    {worldForCategory(formData.category).world?.tagline}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                    Category <span className="text-[var(--text-tertiary)] font-normal">(fine-grained)</span>
                   </label>
                   <select
                     value={formData.category}
@@ -283,22 +312,28 @@ export default function WordDetailPage({
                     }
                     className="input"
                   >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat.replace(/_/g, " ")}
-                      </option>
+                    {Object.values(WORLDS).map((w) => (
+                      <optgroup key={w.id} label={`${w.emoji} ${w.name}`}>
+                        {CATEGORIES_BY_WORLD[w.id]
+                          .filter((c) => (CATEGORIES as readonly string[]).includes(c))
+                          .map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat.replace(/_/g, " ")}
+                            </option>
+                          ))}
+                      </optgroup>
                     ))}
+                    {/* Any categories not yet mapped to a world */}
+                    <optgroup label="⚠ Unmapped">
+                      {CATEGORIES.filter(
+                        (c) => !Object.values(CATEGORIES_BY_WORLD).flat().includes(c)
+                      ).map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat.replace(/_/g, " ")}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
-                  {(() => {
-                    const a = worldForCategory(formData.category);
-                    return (
-                      <p className={`text-xs mt-1 ${a.ambiguous ? "text-[var(--warning)]" : "text-[var(--text-secondary)]"}`}>
-                        {a.world
-                          ? `In-game world: ${a.world.emoji} ${a.world.name} — ${a.world.tagline}`
-                          : `⚠ ${a.note}`}
-                      </p>
-                    );
-                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">

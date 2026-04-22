@@ -2,7 +2,7 @@
 // Reviewers need to see which in-game world a word will appear in, since
 // the DB `category` field is finer-grained than the 7 game worlds.
 
-export type WorldId = "animals" | "food" | "nature" | "space" | "objects" | "magic" | "sight";
+export type WorldId = "animals" | "food" | "nature" | "space" | "objects" | "magic" | "sight" | "feelings";
 
 export interface World {
   id: WorldId;
@@ -12,13 +12,27 @@ export interface World {
 }
 
 export const WORLDS: Record<WorldId, World> = {
-  animals: { id: "animals", name: "Animal Kingdom",    tagline: "Wild creatures, pets & bugs",    emoji: "🐾" },
-  food:    { id: "food",    name: "Kitchen Quest",     tagline: "Food, drinks & kitchen fun",     emoji: "🧁" },
-  nature:  { id: "nature",  name: "Nature Trail",      tagline: "Outdoors, weather & earth",      emoji: "🌳" },
-  space:   { id: "space",   name: "Star Mission",      tagline: "Planets, stars & rockets",       emoji: "🚀" },
-  objects: { id: "objects", name: "Treasure Hunt",     tagline: "Everyday things around you",     emoji: "🎁" },
-  magic:   { id: "magic",   name: "Enchanted Words",   tagline: "Unicorns, wizards & fairy tales", emoji: "✨" },
-  sight:   { id: "sight",   name: "Sight Word School", tagline: "Common words for faster reading", emoji: "📖" },
+  animals:  { id: "animals",  name: "Animal Kingdom",    tagline: "Wild creatures, pets & bugs",     emoji: "🐾" },
+  food:     { id: "food",     name: "Kitchen Quest",     tagline: "Food, drinks & kitchen fun",      emoji: "🧁" },
+  nature:   { id: "nature",   name: "Nature Trail",      tagline: "Outdoors, weather & earth",       emoji: "🌳" },
+  space:    { id: "space",    name: "Star Mission",      tagline: "Planets, stars & rockets",        emoji: "🚀" },
+  objects:  { id: "objects",  name: "Treasure Hunt",     tagline: "Everyday things around you",      emoji: "🎁" },
+  magic:    { id: "magic",    name: "Enchanted Words",   tagline: "Unicorns, wizards & fairy tales", emoji: "✨" },
+  sight:    { id: "sight",    name: "Sight Word School", tagline: "Common words for faster reading", emoji: "📖" },
+  feelings: { id: "feelings", name: "Feelings Forest",   tagline: "Emotions & how we feel",          emoji: "💗" },
+};
+
+// Inverse of worldForCategory — used to group/filter categories by world.
+// Keep in sync with the switch statement below.
+export const CATEGORIES_BY_WORLD: Record<WorldId, string[]> = {
+  sight:    ["sight_words", "heart_words"],
+  animals:  ["animals", "family", "people"],
+  food:     ["food", "body"],
+  nature:   ["nature", "weather", "sports"],
+  space:    ["space", "science"],
+  objects:  ["objects", "clothing", "transport", "home"],
+  magic:    ["concepts", "adventure", "music_arts", "magic"],
+  feelings: ["feelings"],
 };
 
 export interface WorldAssignment {
@@ -53,9 +67,10 @@ export function worldForCategory(category: string): WorldAssignment {
     case "transport":
     case "home":
       return { world: WORLDS.objects, ambiguous: false };
+    case "feelings":
+      return { world: WORLDS.feelings, ambiguous: false };
     case "concepts":
     case "adventure":
-    case "feelings":
     case "music_arts":
     case "magic":
       return { world: WORLDS.magic, ambiguous: false };

@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+// Category groups by world — mirrors lib/worlds.ts. When the caller filters
+// by `world`, translate to the set of categories that route to that world.
+const CATEGORIES_BY_WORLD: Record<string, string[]> = {
+  sight:    ["sight_words", "heart_words"],
+  animals:  ["animals", "family", "people"],
+  food:     ["food", "body"],
+  nature:   ["nature", "weather", "sports"],
+  space:    ["space", "science"],
+  objects:  ["objects", "clothing", "transport", "home"],
+  magic:    ["concepts", "adventure", "music_arts", "magic"],
+  feelings: ["feelings"],
+};
+
 // GET /api/words - List words with optional filters
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -12,6 +25,7 @@ export async function GET(request: NextRequest) {
 
   const searchParams = request.nextUrl.searchParams;
   const category = searchParams.get("category");
+  const world = searchParams.get("world");
   const ageGroup = searchParams.get("ageGroup");
   const level = searchParams.get("level");
   const verified = searchParams.get("verified");
@@ -20,14 +34,18 @@ export async function GET(request: NextRequest) {
   const pageSize = parseInt(searchParams.get("pageSize") || "50");
 
   const where: {
-    category?: string;
+    category?: string | { in: string[] };
     ageGroup?: string;
     level?: number;
     verified?: boolean;
     word?: { contains: string };
   } = {};
 
-  if (category) where.category = category;
+  if (world && CATEGORIES_BY_WORLD[world]) {
+    where.category = { in: CATEGORIES_BY_WORLD[world] };
+  } else if (category) {
+    where.category = category;
+  }
   if (ageGroup) where.ageGroup = ageGroup;
   if (level) where.level = parseInt(level);
   if (verified !== null) where.verified = verified === "true";

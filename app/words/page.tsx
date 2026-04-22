@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation";
 
 export default function WordsPage() {
   const [words, setWords] = useState<Word[]>([]);
-  const [filters, setFilters] = useState<WordFilters>({});
+  const [filters, setFilters] = useState<WordFilters & { world?: string }>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -27,7 +28,8 @@ export default function WordsPage() {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
-    if (filters.category) params.set("category", filters.category);
+    if (filters.world) params.set("world", filters.world);
+    else if (filters.category) params.set("category", filters.category);
     if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
     if (filters.level) params.set("level", String(filters.level));
     if (filters.verified !== undefined) params.set("verified", String(filters.verified));
@@ -90,7 +92,34 @@ export default function WordsPage() {
           </div>
         </div>
 
-        <FilterBar filters={filters} onChange={setFilters} />
+        {(() => {
+          const activeCount = [
+            filters.search, filters.world, filters.category, filters.ageGroup,
+            filters.level, filters.verified !== undefined ? "verified" : null,
+          ].filter(Boolean).length;
+          return (
+            <div>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((v) => !v)}
+                aria-expanded={filtersOpen}
+                aria-controls="words-filters"
+                className="inline-flex items-center gap-2 h-9 px-3 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+              >
+                <span aria-hidden>{filtersOpen ? "▾" : "▸"}</span>
+                Filters
+                {activeCount > 0 && (
+                  <span className="badge badge-neutral">{activeCount}</span>
+                )}
+              </button>
+              {filtersOpen && (
+                <div id="words-filters" className="mt-2">
+                  <FilterBar filters={filters} onChange={setFilters} />
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="mt-6">
           {isLoading ? (

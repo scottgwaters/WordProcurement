@@ -1,136 +1,106 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { AgeGroup, Level, WordFilters } from "@/lib/types";
+import { WORLDS } from "@/lib/worlds";
 
 interface FilterBarProps {
-  filters: WordFilters;
-  onChange: (filters: WordFilters) => void;
+  filters: WordFilters & { world?: string };
+  onChange: (filters: WordFilters & { world?: string }) => void;
+  showStatus?: boolean; // hide verified/pending selector when parent page forces it
 }
 
-export default function FilterBar({ filters, onChange }: FilterBarProps) {
-  const [categories, setCategories] = useState<string[]>([]);
-  const ageGroups: AgeGroup[] = ["4-6", "7-9", "10-12"];
-  const levels: Level[] = [1, 2, 3];
+const AGE_GROUPS: AgeGroup[] = ["4-6", "7-9", "10-12"];
+const LEVELS: Level[] = [1, 2, 3];
 
-  useEffect(() => {
-    async function fetchCategories() {
-      const response = await fetch("/api/words/categories");
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data.categories || []);
-      }
-    }
-    fetchCategories();
-  }, []);
+export default function FilterBar({ filters, onChange, showStatus = true }: FilterBarProps) {
+  const hasAny =
+    filters.search ||
+    filters.category ||
+    filters.world ||
+    filters.ageGroup ||
+    filters.level ||
+    filters.verified !== undefined;
+
+  const selectCls =
+    "h-9 px-2 pr-7 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)]";
 
   return (
-    <div className="card p-4">
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Search */}
-        <div className="flex-1 min-w-[200px]">
-          <input
-            type="text"
-            placeholder="Search words..."
-            value={filters.search || ""}
-            onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            className="input"
-          />
-        </div>
+    <div className="flex flex-wrap items-center gap-2 py-2">
+      <input
+        type="text"
+        placeholder="Search…"
+        value={filters.search || ""}
+        onChange={(e) => onChange({ ...filters, search: e.target.value || undefined })}
+        className="h-9 px-3 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-primary)] min-w-[160px] flex-1"
+        aria-label="Search words"
+      />
 
-        {/* Category */}
-        <select
-          value={filters.category || ""}
-          onChange={(e) =>
-            onChange({ ...filters, category: e.target.value || undefined })
-          }
-          className="input w-auto"
-        >
-          <option value="">All categories</option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat.replace(/_/g, " ")}
-            </option>
-          ))}
-        </select>
+      <select
+        value={filters.world || ""}
+        onChange={(e) => onChange({ ...filters, world: e.target.value || undefined, category: undefined })}
+        className={selectCls}
+        aria-label="Filter by world"
+      >
+        <option value="">All worlds</option>
+        {Object.values(WORLDS).map((w) => (
+          <option key={w.id} value={w.id}>{w.name}</option>
+        ))}
+      </select>
 
-        {/* Age group */}
-        <select
-          value={filters.ageGroup || ""}
-          onChange={(e) =>
-            onChange({
-              ...filters,
-              ageGroup: (e.target.value as AgeGroup) || undefined,
-            })
-          }
-          className="input w-auto"
-        >
-          <option value="">All ages</option>
-          {ageGroups.map((age) => (
-            <option key={age} value={age}>
-              Ages {age}
-            </option>
-          ))}
-        </select>
+      <select
+        value={filters.ageGroup || ""}
+        onChange={(e) =>
+          onChange({ ...filters, ageGroup: (e.target.value as AgeGroup) || undefined })
+        }
+        className={selectCls}
+        aria-label="Filter by age group"
+      >
+        <option value="">All ages</option>
+        {AGE_GROUPS.map((a) => (
+          <option key={a} value={a}>Ages {a}</option>
+        ))}
+      </select>
 
-        {/* Level */}
-        <select
-          value={filters.level?.toString() || ""}
-          onChange={(e) =>
-            onChange({
-              ...filters,
-              level: e.target.value ? (parseInt(e.target.value) as Level) : undefined,
-            })
-          }
-          className="input w-auto"
-        >
-          <option value="">All levels</option>
-          {levels.map((level) => (
-            <option key={level} value={level}>
-              Level {level}
-            </option>
-          ))}
-        </select>
+      <select
+        value={filters.level?.toString() || ""}
+        onChange={(e) =>
+          onChange({ ...filters, level: e.target.value ? (parseInt(e.target.value) as Level) : undefined })
+        }
+        className={selectCls}
+        aria-label="Filter by level"
+      >
+        <option value="">All levels</option>
+        {LEVELS.map((l) => (
+          <option key={l} value={l}>L{l}</option>
+        ))}
+      </select>
 
-        {/* Verification status */}
+      {showStatus && (
         <select
-          value={
-            filters.verified === undefined
-              ? ""
-              : filters.verified
-                ? "verified"
-                : "pending"
-          }
+          value={filters.verified === undefined ? "" : filters.verified ? "verified" : "pending"}
           onChange={(e) =>
             onChange({
               ...filters,
-              verified:
-                e.target.value === ""
-                  ? undefined
-                  : e.target.value === "verified",
+              verified: e.target.value === "" ? undefined : e.target.value === "verified",
             })
           }
-          className="input w-auto"
+          className={selectCls}
+          aria-label="Filter by verification status"
         >
           <option value="">All status</option>
-          <option value="verified">Verified</option>
           <option value="pending">Pending</option>
+          <option value="verified">Verified</option>
         </select>
+      )}
 
-        {/* Clear filters */}
-        {(filters.search ||
-          filters.category ||
-          filters.ageGroup ||
-          filters.level ||
-          filters.verified !== undefined) && (
-          <button
-            onClick={() => onChange({})}
-            className="btn btn-secondary text-sm"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      {hasAny && (
+        <button
+          onClick={() => onChange({})}
+          className="h-9 px-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        >
+          Clear
+        </button>
+      )}
     </div>
   );
 }

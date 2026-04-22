@@ -76,6 +76,10 @@ export async function POST(request: NextRequest) {
                 verifiedAt: w.verified_date ? new Date(w.verified_date) : null,
                 source: "bulk_import",
               },
+              // Content-only update. Verified flag and verifiedAt are deliberately
+              // NOT touched on existing rows so bulk imports don't clobber manual
+              // approvals made through the review UI. Use /api/words/[id]/verify
+              // to change a word's verified state.
               update: {
                 word: w.word.toUpperCase(),
                 ageGroup: w.age_group,
@@ -88,8 +92,6 @@ export async function POST(request: NextRequest) {
                 definition: w.definition || null,
                 exampleSentence: w.example_sentence || null,
                 heartWordExplanation: w.heart_word_explanation || null,
-                verified: w.verified || false,
-                verifiedAt: w.verified_date ? new Date(w.verified_date) : null,
               },
             })
           )
