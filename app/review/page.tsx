@@ -417,7 +417,6 @@ export default function ReviewPage() {
               </div>
               <div className="text-xs text-[var(--text-secondary)]">Remaining</div>
             </div>
-            <ShortcutsHelp />
           </div>
         </div>
 
@@ -490,12 +489,6 @@ export default function ReviewPage() {
                     className="btn btn-secondary text-sm"
                   >
                     Previous
-                    <kbd
-                      aria-hidden
-                      className="ml-1 px-1 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-mono text-[10px] leading-none"
-                    >
-                      K
-                    </kbd>
                   </button>
                   <button
                     onClick={() =>
@@ -505,12 +498,6 @@ export default function ReviewPage() {
                     className="btn btn-secondary text-sm"
                   >
                     Next
-                    <kbd
-                      aria-hidden
-                      className="ml-1 px-1 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-mono text-[10px] leading-none"
-                    >
-                      J
-                    </kbd>
                   </button>
                 </div>
               </div>
@@ -519,7 +506,6 @@ export default function ReviewPage() {
                 <WordCard
                   word={currentWord}
                   showActions
-                  showShortcuts
                   onVerify={handleVerify}
                   onReject={handleReject}
                   onEdit={handleEdit}
@@ -532,77 +518,6 @@ export default function ReviewPage() {
           )}
         </div>
       </main>
-    </div>
-  );
-}
-
-// Small ?-icon in the header that reveals the full list of keyboard
-// shortcuts on hover or focus. Keeps the info discoverable without a full
-// ribbon of text at the top of the page.
-function ShortcutsHelp() {
-  const [open, setOpen] = useState(false);
-  const shortcuts: Array<[string, string]> = [
-    ["A", "Approve"],
-    ["D", "Decline"],
-    ["E", "Edit word"],
-    ["F", "Flag for review"],
-    ["S", "Skip"],
-    ["J", "Next word"],
-    ["K", "Previous word"],
-  ];
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
-        aria-label="Keyboard shortcuts"
-        aria-expanded={open}
-      >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <rect x="2" y="6" width="20" height="12" rx="2" />
-          <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" />
-        </svg>
-      </button>
-      {open && (
-        <div
-          role="tooltip"
-          className="absolute right-0 top-full mt-2 z-10 w-56 p-3 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] shadow-lg text-xs"
-        >
-          <div className="font-semibold text-[var(--text-primary)] mb-2">
-            Keyboard shortcuts
-          </div>
-          <ul className="space-y-1.5">
-            {shortcuts.map(([key, label]) => (
-              <li
-                key={key}
-                className="flex items-center justify-between text-[var(--text-secondary)]"
-              >
-                <span>{label}</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--text-primary)] font-mono text-[10px]">
-                  {key}
-                </kbd>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
