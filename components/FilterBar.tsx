@@ -29,7 +29,8 @@ export default function FilterBar({
     filters.ageGroup ||
     filters.level ||
     filters.verified !== undefined ||
-    filters.flagged !== undefined;
+    filters.flagged !== undefined ||
+    filters.declined !== undefined;
 
   const selectCls =
     "h-9 px-2 pr-7 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)]";
@@ -95,25 +96,39 @@ export default function FilterBar({
       {showStatus && (
         <select
           value={
-            filters.flagged
-              ? "flagged"
-              : filters.verified === undefined
-                ? ""
-                : filters.verified
-                  ? "verified"
-                  : "pending"
+            filters.declined
+              ? "declined"
+              : filters.flagged
+                ? "flagged"
+                : filters.verified === undefined
+                  ? ""
+                  : filters.verified
+                    ? "verified"
+                    : "pending"
           }
           onChange={(e) => {
             const v = e.target.value;
-            // Flagged / verified / pending are mutually exclusive in the UI.
-            if (v === "flagged") {
-              onChange({ ...filters, flagged: true, verified: undefined });
+            // These options are mutually exclusive in the UI.
+            if (v === "declined") {
+              onChange({
+                ...filters,
+                declined: true,
+                verified: undefined,
+                flagged: undefined,
+              });
+            } else if (v === "flagged") {
+              onChange({ ...filters, flagged: true, verified: undefined, declined: undefined });
             } else if (v === "verified") {
-              onChange({ ...filters, verified: true, flagged: undefined });
+              onChange({ ...filters, verified: true, flagged: undefined, declined: undefined });
             } else if (v === "pending") {
-              onChange({ ...filters, verified: false, flagged: undefined });
+              onChange({ ...filters, verified: false, flagged: undefined, declined: undefined });
             } else {
-              onChange({ ...filters, verified: undefined, flagged: undefined });
+              onChange({
+                ...filters,
+                verified: undefined,
+                flagged: undefined,
+                declined: undefined,
+              });
             }
           }}
           className={selectCls}
@@ -123,6 +138,7 @@ export default function FilterBar({
           <option value="pending">Pending</option>
           <option value="verified">Verified</option>
           <option value="flagged">Flagged</option>
+          <option value="declined">Declined</option>
         </select>
       )}
 

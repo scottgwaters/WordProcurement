@@ -163,10 +163,12 @@ export default function ReviewPage() {
   const handleReject = async (wordId: string) => {
     setIsActing(true);
 
-    await fetch(`/api/words/${wordId}/verify`, {
+    // Decline is a soft-delete now — the word drops out of the review
+    // queue permanently unless someone explicitly un-declines it.
+    await fetch(`/api/words/${wordId}/decline`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ verified: false }),
+      body: JSON.stringify({ declined: true }),
     });
 
     const word = words.find((w) => w.id === wordId);
@@ -203,6 +205,12 @@ export default function ReviewPage() {
         verifiedToday: Math.max(0, prev.verifiedToday - 1),
       }));
     } else {
+      // Un-decline to put the word back into the pending pool.
+      await fetch(`/api/words/${lastAction.word.id}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ declined: false }),
+      });
       setStats((prev) => ({
         ...prev,
         remaining: prev.remaining + 1,

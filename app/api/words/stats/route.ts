@@ -20,13 +20,19 @@ export async function GET(request: NextRequest) {
   const byWorld = searchParams.get("byWorld") === "1";
   const wantToday = searchParams.get("today") === "1";
 
-  const [totalWords, verifiedWords, categoryStats] = await Promise.all([
-    prisma.word.count(),
-    prisma.word.count({ where: { verified: true } }),
+  // Exclude declined words from every count — they're soft-deleted, so
+  // counting them would inflate "total" and mislead the progress bar.
+  const [totalWords, verifiedWords, declinedWords, categoryStats] = await Promise.all([
+    prisma.word.count({ where: { declined: false } }),
+    prisma.word.count({ where: { verified: true, declined: false } }),
+    prisma.word.count({ where: { declined: true } }),
     prisma.word.groupBy({
       by: ["category"],
       _count: { category: true },
-      ...(ageGroup ? { where: { ageGroup } } : {}),
+      where: {
+        declined: false,
+        ...(ageGroup ? { ageGroup } : {}),
+      },
     }),
   ]);
 
@@ -74,6 +80,7 @@ export async function GET(request: NextRequest) {
     totalWords,
     verifiedWords,
     unverifiedWords: totalWords - verifiedWords,
+    declinedWords,
     categoryCounts,
     ...(countsByWorld ? { countsByWorld } : {}),
     ...(verifiedToday !== undefined ? { verifiedToday } : {}),

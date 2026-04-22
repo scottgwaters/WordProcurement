@@ -267,6 +267,20 @@ export default function WordDetailPage({
     setIsSaving(false);
   };
 
+  const handleUndecline = async () => {
+    const res = await fetch(`/api/words/${resolvedParams.id}/decline`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ declined: false }),
+    });
+    if (res.ok) {
+      setSuccess("Word restored to pending");
+      await fetchWord();
+    } else {
+      setError("Couldn't un-decline this word");
+    }
+  };
+
   // Discard local edits and reload the server's latest copy. Used by the
   // conflict banner "Reload" action.
   const handleDiscardAndReload = () => {
@@ -332,7 +346,9 @@ export default function WordDetailPage({
               {word.word}
             </h1>
             <div className="flex items-center gap-2 mt-1">
-              {word.verified ? (
+              {word.declined ? (
+                <span className="badge badge-error">Declined</span>
+              ) : word.verified ? (
                 <span className="badge badge-success">Verified</span>
               ) : (
                 <span className="badge badge-warning">Pending</span>
@@ -472,6 +488,27 @@ export default function WordDetailPage({
             </span>{" "}
             You can view it but saving is blocked until their lease expires or they
             navigate away.
+          </div>
+        )}
+
+        {word.declined && (
+          <div className="flex items-start justify-between gap-3 bg-[var(--error-bg)] text-[var(--text-primary)] border border-[var(--error)] px-4 py-3 rounded-lg mb-6 text-sm">
+            <div>
+              <div className="font-medium text-[var(--error)] mb-1">
+                This word is declined
+              </div>
+              <p className="text-[var(--text-secondary)]">
+                It&apos;s hidden from the review queue and won&apos;t be re-added on
+                future imports. Un-decline to put it back into the pending pool.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleUndecline}
+              className="btn btn-secondary text-xs whitespace-nowrap"
+            >
+              Un-decline
+            </button>
           </div>
         )}
 

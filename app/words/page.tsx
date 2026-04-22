@@ -33,6 +33,7 @@ export default function WordsPage() {
     if (filters.level) params.set("level", String(filters.level));
     if (filters.verified !== undefined) params.set("verified", String(filters.verified));
     if (filters.flagged) params.set("flagged", "true");
+    if (filters.declined) params.set("declined", "true");
     if (filters.search) params.set("search", filters.search);
 
     const response = await fetch(`/api/words?${params.toString()}`);
@@ -140,7 +141,14 @@ export default function WordsPage() {
                       </td>
                       <td>
                         <div className="flex flex-wrap items-center gap-1">
-                          {word.verified ? (
+                          {word.declined ? (
+                            <span
+                              className="badge badge-error"
+                              title="Declined — hidden from the review queue"
+                            >
+                              Declined
+                            </span>
+                          ) : word.verified ? (
                             <span className="badge badge-success">Verified</span>
                           ) : (
                             <span className="badge badge-warning">Pending</span>

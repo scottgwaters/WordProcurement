@@ -55,6 +55,11 @@ model Word {
   verifiedAt           DateTime? @map("verified_at")
   verifiedById         String?   @map("verified_by")
   verifiedBy           User?     @relation("VerifiedBy", fields: [verifiedById], references: [id])
+  // Soft-delete marker for words the reviewers have decided don't belong
+  // in the game. Distinct from `verified=false` (pending) — declined words
+  // stay out of the review queue and survive re-imports.
+  declined             Boolean   @default(false)
+  declinedAt           DateTime? @map("declined_at")
   createdAt            DateTime  @default(now()) @map("created_at")
   createdById          String?   @map("created_by")
   createdBy            User?     @relation("CreatedBy", fields: [createdById], references: [id])

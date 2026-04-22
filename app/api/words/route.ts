@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   const level = searchParams.get("level");
   const verified = searchParams.get("verified");
   const flagged = searchParams.get("flagged");
+  const declined = searchParams.get("declined");
   const search = searchParams.get("search");
   const excludeLeased = searchParams.get("excludeLeased") === "1";
   const page = parseInt(searchParams.get("page") || "0");
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
     ageGroup?: string;
     level?: number;
     verified?: boolean;
+    declined?: boolean;
     word?: { contains: string };
     id?: { in?: string[]; notIn?: string[] };
   } = {};
@@ -70,6 +72,15 @@ export async function GET(request: NextRequest) {
   if (level) where.level = parseInt(level);
   if (verified !== null) where.verified = verified === "true";
   if (search) where.word = { contains: search };
+
+  // Declined words are hidden by default so the normal review/listing
+  // workflows don't surface them again. Pass declined=true to see the
+  // declined pool (for un-declining), or declined=all to show everything.
+  if (declined === "true") {
+    where.declined = true;
+  } else if (declined !== "all") {
+    where.declined = false;
+  }
 
   // When the caller asks for flagged-only, restrict to the set we just built.
   if (flagged === "true") {
@@ -124,6 +135,7 @@ export async function GET(request: NextRequest) {
     created_by: w.createdById,
     source: w.source,
     flagged: flaggedIds.has(w.id),
+    declined: w.declined,
   }));
 
   return NextResponse.json({

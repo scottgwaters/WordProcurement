@@ -27,6 +27,8 @@ export interface Word {
   verified: boolean;
   verified_at: string | null;
   verified_by: string | null;
+  /** Soft-delete marker. Declined words are hidden from the default queue. */
+  declined?: boolean;
   /** Present on list responses — derived from activity_log on the server. */
   flagged?: boolean;
   created_at: string;
@@ -85,6 +87,9 @@ export interface WordFilters {
    *  computed from activity_log on the server. Mutually exclusive with
    *  `verified` in the UI — selecting "Flagged" clears verified. */
   flagged?: boolean;
+  /** True when the "Declined" status option is selected — surfaces the
+   *  soft-deleted pool so admins can un-decline if they change their mind. */
+  declined?: boolean;
   search?: string;
 }
 

@@ -76,10 +76,12 @@ export async function POST(request: NextRequest) {
                 verifiedAt: w.verified_date ? new Date(w.verified_date) : null,
                 source: "bulk_import",
               },
-              // Content-only update. Verified flag and verifiedAt are deliberately
-              // NOT touched on existing rows so bulk imports don't clobber manual
-              // approvals made through the review UI. Use /api/words/[id]/verify
-              // to change a word's verified state.
+              // Content-only update. Review status fields — `verified`,
+              // `verifiedAt`, `declined`, `declinedAt` — are deliberately
+              // NOT touched on existing rows so bulk imports don't clobber
+              // manual approvals or declines made through the review UI.
+              // Use /api/words/[id]/verify or /api/words/[id]/decline to
+              // change those states.
               update: {
                 word: w.word.toUpperCase(),
                 ageGroup: w.age_group,

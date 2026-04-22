@@ -43,6 +43,8 @@ export async function GET(
     created_at: word.createdAt,
     created_by: word.createdById,
     source: word.source,
+    declined: word.declined,
+    declined_at: word.declinedAt,
     // Optimistic concurrency token — clients echo this on PATCH so two
     // reviewers editing the same word can't silently overwrite each other.
     version: word.version,
