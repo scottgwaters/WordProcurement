@@ -8,9 +8,9 @@
 :root {
   /* Surfaces */
   --bg-primary: #FFFFFF;
-  --bg-secondary: #F8FAF8;   /* page background */
-  --bg-tertiary: #F1F4F0;    /* hover, zebra */
-  --bg-muted: #E8EDE5;
+  --bg-secondary: #F9FAFB;   /* page background — neutral off-white */
+  --bg-tertiary: #F3F4F6;    /* hover, zebra */
+  --bg-muted: #E5E7EB;
 
   /* Text */
   --text-primary: #1F2937;
@@ -22,12 +22,12 @@
   --border-light: #E5E7EB;
   --border-strong: #9CA3AF;
 
-  /* Accent — sage */
-  --accent: #8FA287;
-  --accent-hover: #7A8D72;
-  --accent-active: #677C5F;
-  --accent-soft: #C7D4C0;
-  --accent-softer: #E4ECDF;
+  /* Accent — slate / graphite */
+  --accent: #4B5563;
+  --accent-hover: #374151;
+  --accent-active: #1F2937;
+  --accent-soft: #D1D5DB;
+  --accent-softer: #F3F4F6;
 
   /* Semantic — muted */
   --success: #5B8A5B;  --success-bg: #E3EFE3;
