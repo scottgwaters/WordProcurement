@@ -154,6 +154,38 @@ body {
 }
 .btn-danger:hover { background: color-mix(in srgb, var(--error) 85%, black); }
 
+/* Approve — vivid green, dominant primary. Dedicated variant so the sage accent
+   stays muted elsewhere and Approve carries real "go" weight. */
+.btn-approve {
+  background: #16A34A;   /* green-600 */
+  color: #FFFFFF;
+  min-width: 140px;
+}
+.btn-approve:hover { background: #15803D; } /* green-700 */
+.btn-approve:active { background: #166534; } /* green-800 */
+
+/* Outlined danger — demotes Reject so Approve dominates, but keeps the red
+   semantic signal for accessibility (color + outline + label). */
+.btn-outline-danger {
+  background: transparent;
+  color: var(--error);
+  border-color: var(--error);
+  min-width: 110px;
+}
+.btn-outline-danger:hover {
+  background: var(--error-bg);
+}
+
+/* Ghost — lowest-weight action for passive moves like Skip. */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+.btn-ghost:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
 /* ---------- Inputs ---------- */
 .input {
   width: 100%;

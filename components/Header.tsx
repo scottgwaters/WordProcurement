@@ -17,6 +17,8 @@ export default function Header() {
     { href: "/review", label: "Review" },
     { href: "/words", label: "Words" },
     { href: "/activity", label: "Activity" },
+    // Users section is admin-only; other roles never see the link.
+    ...(session?.user?.isAdmin ? [{ href: "/admin/users", label: "Users" }] : []),
   ];
 
   return (

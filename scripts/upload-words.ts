@@ -10,7 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-const API_URL = process.env.API_URL || "https://wordprocurement.dailey.cloud";
+const API_URL = process.env.API_URL || "https://word-procurement.dailey.cloud";
 const COOKIE = process.env.COOKIE;
 
 interface WordsFile {
@@ -47,7 +47,7 @@ async function main() {
   // Read the words file
   const wordFilePath = path.join(
     __dirname,
-    "../../../Wordnauts/Wordnauts/Resources/answer_words.json"
+    "../../../Wordnauts/Wordnauts/Wordnauts/Resources/answer_words.json"
   );
 
   if (!fs.existsSync(wordFilePath)) {
@@ -70,6 +70,12 @@ async function main() {
     const chunk = wordsData.words.slice(i, i + chunkSize);
     console.log(`Uploading chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(wordsData.words.length / chunkSize)}...`);
 
+    // Override verified to false - words need human review
+    const wordsToUpload = chunk.map((word) => ({
+      ...word,
+      verified: false,
+    }));
+
     try {
       const response = await fetch(`${API_URL}/api/import`, {
         method: "POST",
@@ -77,7 +83,7 @@ async function main() {
           "Content-Type": "application/json",
           "Cookie": COOKIE,
         },
-        body: JSON.stringify({ words: chunk }),
+        body: JSON.stringify({ words: wordsToUpload }),
       });
 
       if (!response.ok) {

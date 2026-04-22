@@ -11,13 +11,30 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   password  String
+  isAdmin   Boolean  @default(false) @map("is_admin")
   createdAt DateTime @default(now()) @map("created_at")
 
-  words         Word[]        @relation("CreatedBy")
-  verifiedWords Word[]        @relation("VerifiedBy")
-  activityLogs  ActivityLog[]
+  words          Word[]         @relation("CreatedBy")
+  verifiedWords  Word[]         @relation("VerifiedBy")
+  activityLogs   ActivityLog[]
+  invitesCreated InviteToken[]  @relation("InvitedBy")
 
   @@map("users")
+}
+
+model InviteToken {
+  id          String    @id @default(cuid())
+  email       String
+  token       String    @unique
+  createdById String    @map("created_by")
+  createdBy   User      @relation("InvitedBy", fields: [createdById], references: [id])
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([token])
+  @@map("invite_tokens")
 }
 
 model Word {

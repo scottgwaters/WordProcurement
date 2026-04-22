@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback, use } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
-import HintGenerator from "@/components/HintGenerator";
-import type { Word, GeneratedHints, AgeGroup, Level, ActivityLogWithUser } from "@/lib/types";
+import type { Word, AgeGroup, Level, ActivityLogWithUser } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/types";
@@ -42,7 +41,6 @@ export default function WordDetailPage({
     part_of_speech: "",
     pronunciation: "",
     heart_word_explanation: "",
-    source: "",
   });
 
   const router = useRouter();
@@ -84,7 +82,6 @@ export default function WordDetailPage({
       part_of_speech: data.part_of_speech || "",
       pronunciation: data.pronunciation || "",
       heart_word_explanation: data.heart_word_explanation || "",
-      source: data.source || "",
     });
 
     setIsLoading(false);
@@ -119,7 +116,6 @@ export default function WordDetailPage({
       part_of_speech: formData.part_of_speech || null,
       pronunciation: formData.pronunciation || null,
       heart_word_explanation: formData.heart_word_explanation || null,
-      source: formData.source || null,
     };
 
     const response = await fetch(`/api/words/${resolvedParams.id}`, {
@@ -132,43 +128,6 @@ export default function WordDetailPage({
       setError("Failed to save changes");
     } else {
       setSuccess("Changes saved successfully");
-      fetchWord();
-    }
-
-    setIsSaving(false);
-  };
-
-  const handleHintsSave = async (hints: GeneratedHints) => {
-    setFormData((prev) => ({
-      ...prev,
-      hints_easy: hints.hints.easy,
-      hints_medium: hints.hints.medium,
-      hints_hard: hints.hints.hard,
-      definition: hints.definition,
-      example_sentence: hints.example_sentence,
-      part_of_speech: hints.part_of_speech,
-    }));
-
-    // Auto-save after generating hints
-    setIsSaving(true);
-
-    const updateData = {
-      hints: hints.hints,
-      definition: hints.definition,
-      example_sentence: hints.example_sentence,
-      part_of_speech: hints.part_of_speech,
-    };
-
-    const response = await fetch(`/api/words/${resolvedParams.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updateData),
-    });
-
-    if (!response.ok) {
-      setError("Failed to save hints");
-    } else {
-      setSuccess("AI-generated hints saved successfully");
       fetchWord();
     }
 
@@ -256,9 +215,9 @@ export default function WordDetailPage({
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
           {/* Main form */}
-          <div className="md:col-span-2 space-y-6">
+          <div className="space-y-6">
             {/* Basic info */}
             <div className="card p-6">
               <h2 className="text-lg font-semibold mb-4">Basic Information</h2>
@@ -373,20 +332,6 @@ export default function WordDetailPage({
                     <option value={3}>Level 3</option>
                   </select>
                 </div>
-              </div>
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                  Source
-                </label>
-                <input
-                  type="text"
-                  value={formData.source}
-                  onChange={(e) =>
-                    setFormData({ ...formData, source: e.target.value })
-                  }
-                  className="input"
-                  placeholder="Where this word came from (e.g., Dolch list, Fry words)"
-                />
               </div>
             </div>
 
@@ -616,10 +561,6 @@ export default function WordDetailPage({
             </div>
           </div>
 
-          {/* AI Hint Generator sidebar */}
-          <div>
-            <HintGenerator word={word} onSave={handleHintsSave} />
-          </div>
         </div>
       </main>
     </div>

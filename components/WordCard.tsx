@@ -10,6 +10,7 @@ interface WordCardProps {
   onVerify?: (wordId: string) => void;
   onReject?: (wordId: string) => void;
   onEdit?: (wordId: string) => void;
+  onFlag?: (wordId: string) => void;
   onSkip?: () => void;
   isLoading?: boolean;
 }
@@ -20,6 +21,7 @@ export default function WordCard({
   onVerify,
   onReject,
   onEdit,
+  onFlag,
   onSkip,
   isLoading = false,
 }: WordCardProps) {
@@ -112,36 +114,58 @@ export default function WordCard({
         </div>
       )}
 
-      {/* Actions */}
+      {/* Actions — progressive commitment: low-weight left, irreversible right */}
       {showActions && (
         <div className="flex items-center gap-3 mt-6 pt-4 border-t border-[var(--border-light)]">
           <button
+            onClick={onSkip}
+            disabled={isLoading}
+            className="btn btn-ghost"
+            aria-label="Skip this word"
+          >
+            Skip
+          </button>
+          <button
+            onClick={() => onEdit?.(word.id)}
+            disabled={isLoading}
+            className="btn btn-secondary inline-flex items-center gap-2"
+            aria-label="Edit this word"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Edit
+          </button>
+          {onFlag && (
+            <button
+              onClick={() => onFlag(word.id)}
+              disabled={isLoading}
+              className="btn btn-secondary inline-flex items-center gap-2"
+              aria-label="Flag this word for another reviewer"
+              title="Flag for another reviewer to look at"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                <line x1="4" y1="22" x2="4" y2="15" />
+              </svg>
+              Flag
+            </button>
+          )}
+          <div className="flex-1" aria-hidden />
+          <button
             onClick={() => onVerify?.(word.id)}
             disabled={isLoading}
-            className="btn btn-success flex-1"
+            className="btn btn-approve"
           >
             {isLoading ? <span className="spinner" /> : "Approve"}
           </button>
           <button
             onClick={() => onReject?.(word.id)}
             disabled={isLoading}
-            className="btn btn-danger flex-1"
+            className="btn btn-outline-danger"
           >
             Reject
-          </button>
-          <button
-            onClick={() => onEdit?.(word.id)}
-            disabled={isLoading}
-            className="btn btn-secondary"
-          >
-            Edit
-          </button>
-          <button
-            onClick={onSkip}
-            disabled={isLoading}
-            className="btn btn-secondary"
-          >
-            Skip
           </button>
         </div>
       )}

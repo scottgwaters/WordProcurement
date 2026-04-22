@@ -111,6 +111,24 @@ export default function ReviewPage() {
     router.push(`/words/${wordId}?from=review`);
   };
 
+  const handleFlag = async (wordId: string) => {
+    const reason = window.prompt(
+      "Flag this word for another reviewer. Add an optional note:"
+    );
+    if (reason === null) return; // cancelled
+    setIsActing(true);
+    await fetch(`/api/words/${wordId}/flag`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flagged: true, reason: reason || undefined }),
+    });
+    // Move past the flagged word to the next one so reviewer can keep moving
+    if (currentIndex < words.length - 1) {
+      setCurrentIndex((i) => i + 1);
+    }
+    setIsActing(false);
+  };
+
   const currentWord = words[currentIndex];
 
   if (status === "loading") {
@@ -210,6 +228,7 @@ export default function ReviewPage() {
                   onVerify={handleVerify}
                   onReject={handleReject}
                   onEdit={handleEdit}
+                  onFlag={handleFlag}
                   onSkip={handleSkip}
                   isLoading={isActing}
                 />

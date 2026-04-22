@@ -38,6 +38,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return {
           id: user.id,
           email: user.email,
+          isAdmin: user.isAdmin,
         };
       },
     }),
@@ -49,17 +50,44 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
+        token.isAdmin = (user as { isAdmin?: boolean }).isAdmin ?? false;
+      }
+      // Re-read isAdmin from the DB when the token is refreshed so that
+      // promoting a user to admin takes effect on their next request
+      // without requiring a sign-out + sign-in cycle.
+      if (trigger === "update" || (token.id && token.isAdmin === undefined)) {
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { isAdmin: true },
+        });
+        if (fresh) {
+          token.isAdmin = fresh.isAdmin;
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.isAdmin = Boolean(token.isAdmin);
       }
       return session;
     },
   },
 });
+
+// Throws a Response-style error an API route can re-raise. Returns the
+// session for convenience so callers can use session.user directly.
+export async function requireAdmin() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { session: null, error: { status: 401, message: "Unauthorized" } };
+  }
+  if (!session.user.isAdmin) {
+    return { session, error: { status: 403, message: "Admin only" } };
+  }
+  return { session, error: null as null };
+}

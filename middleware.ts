@@ -3,11 +3,17 @@ import { NextResponse } from "next/server";
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
-  const isAuthPage = req.nextUrl.pathname === "/login";
-  const isSetupPage = req.nextUrl.pathname === "/setup";
-  const isAuthApi = req.nextUrl.pathname.startsWith("/api/auth");
-  const isSetupApi = req.nextUrl.pathname === "/api/setup";
-  const isImportApi = req.nextUrl.pathname === "/api/import";
+  const { pathname } = req.nextUrl;
+  const isAuthPage = pathname === "/login";
+  const isSetupPage = pathname === "/setup";
+  const isAuthApi = pathname.startsWith("/api/auth");
+  const isSetupApi = pathname === "/api/setup";
+  const isImportApi = pathname === "/api/import";
+  // Invite links are emailed to recipients who do not yet have accounts,
+  // so the token page and its validation/accept APIs must be reachable
+  // without a session.
+  const isInvitePage = pathname.startsWith("/invite/");
+  const isInviteApi = pathname.startsWith("/api/invites/");
 
   // Allow auth and setup API routes
   if (isAuthApi || isSetupApi) {
@@ -25,6 +31,13 @@ export default auth((req) => {
 
   // Allow setup page (it checks internally if setup is needed)
   if (isSetupPage) {
+    return NextResponse.next();
+  }
+
+  // Allow invite flow: /invite/[token] page and /api/invites/[token] endpoints
+  // (token validation + accept). Authorization is enforced in-handler by
+  // matching the token, not by the session.
+  if (isInvitePage || isInviteApi) {
     return NextResponse.next();
   }
 
