@@ -36,12 +36,16 @@ export default function WordCard({
             {word.word}
           </Link>
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            <span className="badge badge-neutral">{word.category}</span>
-            <span className="badge badge-neutral">Ages {word.age_group}</span>
-            <span className="badge badge-neutral">Level {word.level}</span>
+            {/* Classification — neutral */}
+            <span className="badge badge-meta-category">{word.category.replace(/_/g, " ")}</span>
+            {/* Audience — cool tint */}
+            <span className="badge badge-meta-age">Ages {word.age_group}</span>
+            {/* Difficulty — warm tint */}
+            <span className="badge badge-meta-level">Level {word.level}</span>
+            {/* Destination — accent tint */}
             {assignment.world ? (
               <span
-                className="badge badge-neutral"
+                className="badge badge-meta-world"
                 title={assignment.world.tagline}
               >
                 {assignment.world.emoji} {assignment.world.name}
@@ -90,7 +94,7 @@ export default function WordCard({
 
       {/* Educational metadata */}
       {(word.definition || word.example_sentence) && (
-        <div className="border-t border-[var(--border-light)] pt-4 mt-4 space-y-2">
+        <div className="border-t border-[var(--border-light)] pt-6 mt-8 space-y-3">
           {word.definition && (
             <div className="text-sm">
               <span className="font-medium text-[var(--text-secondary)]">Definition: </span>
