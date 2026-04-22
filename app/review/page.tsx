@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import WordCard from "@/components/WordCard";
 import FilterBar from "@/components/FilterBar";
+import { useDialog } from "@/components/Dialog";
 import type { Word, WordFilters } from "@/lib/types";
 import { useRouter } from "next/navigation";
 
@@ -23,6 +24,7 @@ export default function ReviewPage() {
 
   const router = useRouter();
   const { status } = useSession();
+  const dlg = useDialog();
 
   const fetchWords = useCallback(async () => {
     if (status !== "authenticated") return;
@@ -39,6 +41,7 @@ export default function ReviewPage() {
     else if (filters.category) params.set("category", filters.category);
     if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
     if (filters.level) params.set("level", String(filters.level));
+    if (filters.flagged) params.set("flagged", "true");
     if (filters.search) params.set("search", filters.search);
 
     const response = await fetch(`/api/words?${params.toString()}`);
@@ -124,9 +127,13 @@ export default function ReviewPage() {
   };
 
   const handleFlag = async (wordId: string) => {
-    const reason = window.prompt(
-      "Flag this word for another reviewer. Add an optional note:"
-    );
+    const reason = await dlg.prompt({
+      title: "Flag for another reviewer",
+      message: "What should they look at? Leave blank if you don't need to say.",
+      placeholder: "Optional note",
+      multiline: true,
+      okLabel: "Flag word",
+    });
     if (reason === null) return; // cancelled
     setIsActing(true);
     await fetch(`/api/words/${wordId}/flag`, {
@@ -279,6 +286,7 @@ export default function ReviewPage() {
           filters={filters}
           onChange={(newFilters) => setFilters({ ...newFilters, verified: false })}
           showStatus={false}
+          showFlaggedToggle
         />
 
         <div className="mt-6">

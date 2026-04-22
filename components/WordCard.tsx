@@ -67,11 +67,19 @@ export default function WordCard({
             </p>
           )}
         </div>
-        <div>
+        <div className="flex flex-col items-end gap-1">
           {word.verified ? (
             <span className="badge badge-success">Verified</span>
           ) : (
             <span className="badge badge-warning">Pending</span>
+          )}
+          {word.flagged && (
+            <span
+              className="badge badge-warning"
+              title="Flagged for another reviewer"
+            >
+              ⚑ Flagged
+            </span>
           )}
         </div>
       </div>

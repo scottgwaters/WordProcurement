@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useDialog } from "@/components/Dialog";
 
 type User = {
   id: string;
@@ -23,6 +24,7 @@ type IssuedInvite = { email: string; link: string };
 
 export default function AdminUsersClient() {
   const { data: session } = useSession();
+  const dlg = useDialog();
   const currentUserId = session?.user?.id;
   const [users, setUsers] = useState<User[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -85,33 +87,46 @@ export default function AdminUsersClient() {
     }
   };
 
-  const handleRevoke = async (id: string) => {
-    if (!confirm("Revoke this invite? The link will stop working immediately.")) {
-      return;
-    }
+  const handleRevoke = async (id: string, email: string) => {
+    const ok = await dlg.confirm({
+      title: `Revoke invite for ${email}?`,
+      message: "The link will stop working immediately. You can issue a new invite any time.",
+      confirmLabel: "Revoke",
+      destructive: true,
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/invites/${id}`, { method: "DELETE" });
     if (res.ok) {
       await refresh();
     } else {
       const data = await res.json().catch(() => ({}));
-      alert(data.error ?? "Could not revoke invite");
+      await dlg.alert({
+        title: "Couldn't revoke invite",
+        message: data.error ?? "Please try again.",
+        tone: "error",
+      });
     }
   };
 
   const handleDeleteUser = async (user: User) => {
-    if (
-      !confirm(
-        `Delete ${user.email}? This permanently removes their account. Users with existing review history cannot be deleted.`
-      )
-    ) {
-      return;
-    }
+    const ok = await dlg.confirm({
+      title: `Delete ${user.email}?`,
+      message:
+        "This permanently removes their account. Users with existing review history can't be deleted — their audit trail stays intact.",
+      confirmLabel: "Delete user",
+      destructive: true,
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
     if (res.ok) {
       await refresh();
     } else {
       const data = await res.json().catch(() => ({}));
-      alert(data.error ?? "Could not delete user");
+      await dlg.alert({
+        title: "Couldn't delete user",
+        message: data.error ?? "Please try again.",
+        tone: "error",
+      });
     }
   };
 
@@ -121,9 +136,14 @@ export default function AdminUsersClient() {
       setCopiedLink(link);
       setTimeout(() => setCopiedLink((current) => (current === link ? null : current)), 1800);
     } catch {
-      // Clipboard API can fail on insecure contexts — fall back to a prompt
-      // so the admin can still select + copy the link manually.
-      prompt("Copy this invite link:", link);
+      // Clipboard API can fail on insecure contexts — show the link in our
+      // custom dialog so the admin can select + copy it manually.
+      await dlg.prompt({
+        title: "Copy invite link",
+        message: "Your browser blocked clipboard access. Select the link below and copy it.",
+        initialValue: link,
+        okLabel: "Close",
+      });
     }
   };
 
@@ -182,9 +202,15 @@ export default function AdminUsersClient() {
         )}
       </section>
 
-      {/* Pending invites */}
+      {/* Invited — not set up yet */}
       <section className="card p-6">
-        <h2 className="text-lg font-semibold mb-4">Pending invites</h2>
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold">Invited — not set up yet</h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
+            These users got an invite but haven&apos;t set their password yet.
+            Copy the link to resend it to them.
+          </p>
+        </div>
         {loading ? (
           <div className="text-sm text-[var(--text-secondary)]">Loading…</div>
         ) : invites.length === 0 ? (
@@ -212,13 +238,13 @@ export default function AdminUsersClient() {
                   <button
                     type="button"
                     onClick={() => copyLink(link)}
-                    className="btn btn-secondary text-xs"
+                    className="btn btn-primary text-xs"
                   >
-                    {copiedLink === link ? "Copied!" : "Copy link"}
+                    {copiedLink === link ? "Copied!" : "Copy invite link"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleRevoke(invite.id)}
+                    onClick={() => handleRevoke(invite.id, invite.email)}
                     className="btn btn-secondary text-xs"
                   >
                     Revoke

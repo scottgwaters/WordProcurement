@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 export default function WordsPage() {
   const [words, setWords] = useState<Word[]>([]);
   const [filters, setFilters] = useState<WordFilters & { world?: string }>({});
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -33,6 +32,7 @@ export default function WordsPage() {
     if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
     if (filters.level) params.set("level", String(filters.level));
     if (filters.verified !== undefined) params.set("verified", String(filters.verified));
+    if (filters.flagged) params.set("flagged", "true");
     if (filters.search) params.set("search", filters.search);
 
     const response = await fetch(`/api/words?${params.toString()}`);
@@ -92,34 +92,7 @@ export default function WordsPage() {
           </div>
         </div>
 
-        {(() => {
-          const activeCount = [
-            filters.search, filters.world, filters.category, filters.ageGroup,
-            filters.level, filters.verified !== undefined ? "verified" : null,
-          ].filter(Boolean).length;
-          return (
-            <div>
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((v) => !v)}
-                aria-expanded={filtersOpen}
-                aria-controls="words-filters"
-                className="inline-flex items-center gap-2 h-9 px-3 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-              >
-                <span aria-hidden>{filtersOpen ? "▾" : "▸"}</span>
-                Filters
-                {activeCount > 0 && (
-                  <span className="badge badge-neutral">{activeCount}</span>
-                )}
-              </button>
-              {filtersOpen && (
-                <div id="words-filters" className="mt-2">
-                  <FilterBar filters={filters} onChange={setFilters} />
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        <FilterBar filters={filters} onChange={setFilters} />
 
         <div className="mt-6">
           {isLoading ? (
@@ -166,11 +139,21 @@ export default function WordsPage() {
                         <span className="text-sm">{word.level}</span>
                       </td>
                       <td>
-                        {word.verified ? (
-                          <span className="badge badge-success">Verified</span>
-                        ) : (
-                          <span className="badge badge-warning">Pending</span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1">
+                          {word.verified ? (
+                            <span className="badge badge-success">Verified</span>
+                          ) : (
+                            <span className="badge badge-warning">Pending</span>
+                          )}
+                          {word.flagged && (
+                            <span
+                              className="badge badge-warning"
+                              title="Flagged for another reviewer"
+                            >
+                              ⚑ Flagged
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <Link

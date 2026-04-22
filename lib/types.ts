@@ -27,6 +27,8 @@ export interface Word {
   verified: boolean;
   verified_at: string | null;
   verified_by: string | null;
+  /** Present on list responses — derived from activity_log on the server. */
+  flagged?: boolean;
   created_at: string;
   created_by: string | null;
   source: string | null;
@@ -79,6 +81,10 @@ export interface WordFilters {
   ageGroup?: AgeGroup;
   level?: Level;
   verified?: boolean;
+  /** True when the "Flagged" status option is selected. Flag state is
+   *  computed from activity_log on the server. Mutually exclusive with
+   *  `verified` in the UI — selecting "Flagged" clears verified. */
+  flagged?: boolean;
   search?: string;
 }
 

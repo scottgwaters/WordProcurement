@@ -29,10 +29,28 @@ export async function GET(request: NextRequest) {
   const ageGroup = searchParams.get("ageGroup");
   const level = searchParams.get("level");
   const verified = searchParams.get("verified");
+  const flagged = searchParams.get("flagged");
   const search = searchParams.get("search");
   const excludeLeased = searchParams.get("excludeLeased") === "1";
   const page = parseInt(searchParams.get("page") || "0");
   const pageSize = parseInt(searchParams.get("pageSize") || "50");
+
+  // Flag state is derived from activity_log, not a column. Build a map of
+  // wordId → flagged (boolean) by scanning the flag/unflag history newest
+  // first; the first row seen for each wordId is its current state. Scoped
+  // to a single list endpoint so volume stays bounded.
+  const flagRows = await prisma.activityLog.findMany({
+    where: { action: { in: ["flagged", "unflagged"] } },
+    orderBy: { createdAt: "desc" },
+    select: { wordId: true, action: true },
+  });
+  const flaggedIds = new Set<string>();
+  const seenFlag = new Set<string>();
+  for (const row of flagRows) {
+    if (seenFlag.has(row.wordId)) continue;
+    seenFlag.add(row.wordId);
+    if (row.action === "flagged") flaggedIds.add(row.wordId);
+  }
 
   const where: {
     category?: string | { in: string[] };
@@ -40,7 +58,7 @@ export async function GET(request: NextRequest) {
     level?: number;
     verified?: boolean;
     word?: { contains: string };
-    id?: { notIn: string[] };
+    id?: { in?: string[]; notIn?: string[] };
   } = {};
 
   if (world && CATEGORIES_BY_WORLD[world]) {
@@ -52,6 +70,12 @@ export async function GET(request: NextRequest) {
   if (level) where.level = parseInt(level);
   if (verified !== null) where.verified = verified === "true";
   if (search) where.word = { contains: search };
+
+  // When the caller asks for flagged-only, restrict to the set we just built.
+  if (flagged === "true") {
+    const ids = Array.from(flaggedIds);
+    where.id = ids.length > 0 ? { in: ids } : { in: ["__none__"] };
+  }
 
   // Soft-lock filter: when the caller asks (e.g. the review queue),
   // exclude words that another reviewer is currently editing so two
@@ -65,7 +89,7 @@ export async function GET(request: NextRequest) {
       select: { wordId: true },
     });
     if (otherLeases.length > 0) {
-      where.id = { notIn: otherLeases.map((l) => l.wordId) };
+      where.id = { ...(where.id ?? {}), notIn: otherLeases.map((l) => l.wordId) };
     }
   }
 
@@ -99,6 +123,7 @@ export async function GET(request: NextRequest) {
     created_at: w.createdAt,
     created_by: w.createdById,
     source: w.source,
+    flagged: flaggedIds.has(w.id),
   }));
 
   return NextResponse.json({

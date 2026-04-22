@@ -7,19 +7,29 @@ interface FilterBarProps {
   filters: WordFilters & { world?: string };
   onChange: (filters: WordFilters & { world?: string }) => void;
   showStatus?: boolean; // hide verified/pending selector when parent page forces it
+  /** Render a standalone "Flagged only" toggle. Used on the review page
+   *  where the status selector is hidden (verified is forced) but we still
+   *  want reviewers to narrow down to the flagged queue. */
+  showFlaggedToggle?: boolean;
 }
 
 const AGE_GROUPS: AgeGroup[] = ["4-6", "7-9", "10-12"];
 const LEVELS: Level[] = [1, 2, 3];
 
-export default function FilterBar({ filters, onChange, showStatus = true }: FilterBarProps) {
+export default function FilterBar({
+  filters,
+  onChange,
+  showStatus = true,
+  showFlaggedToggle = false,
+}: FilterBarProps) {
   const hasAny =
     filters.search ||
     filters.category ||
     filters.world ||
     filters.ageGroup ||
     filters.level ||
-    filters.verified !== undefined;
+    filters.verified !== undefined ||
+    filters.flagged !== undefined;
 
   const selectCls =
     "h-9 px-2 pr-7 text-sm rounded-md border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)]";
@@ -84,20 +94,56 @@ export default function FilterBar({ filters, onChange, showStatus = true }: Filt
 
       {showStatus && (
         <select
-          value={filters.verified === undefined ? "" : filters.verified ? "verified" : "pending"}
-          onChange={(e) =>
-            onChange({
-              ...filters,
-              verified: e.target.value === "" ? undefined : e.target.value === "verified",
-            })
+          value={
+            filters.flagged
+              ? "flagged"
+              : filters.verified === undefined
+                ? ""
+                : filters.verified
+                  ? "verified"
+                  : "pending"
           }
+          onChange={(e) => {
+            const v = e.target.value;
+            // Flagged / verified / pending are mutually exclusive in the UI.
+            if (v === "flagged") {
+              onChange({ ...filters, flagged: true, verified: undefined });
+            } else if (v === "verified") {
+              onChange({ ...filters, verified: true, flagged: undefined });
+            } else if (v === "pending") {
+              onChange({ ...filters, verified: false, flagged: undefined });
+            } else {
+              onChange({ ...filters, verified: undefined, flagged: undefined });
+            }
+          }}
           className={selectCls}
           aria-label="Filter by verification status"
         >
           <option value="">All status</option>
           <option value="pending">Pending</option>
           <option value="verified">Verified</option>
+          <option value="flagged">Flagged</option>
         </select>
+      )}
+
+      {showFlaggedToggle && (
+        <label
+          className={`inline-flex items-center gap-2 h-9 px-3 text-sm rounded-md border cursor-pointer select-none ${
+            filters.flagged
+              ? "border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning)] font-medium"
+              : "border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={filters.flagged ?? false}
+            onChange={(e) =>
+              onChange({ ...filters, flagged: e.target.checked ? true : undefined })
+            }
+            className="accent-[var(--warning)]"
+          />
+          ⚑ Flagged only
+        </label>
       )}
 
       {hasAny && (
