@@ -154,18 +154,18 @@ export default function WordCard({
           )}
           <div className="flex-1" aria-hidden />
           <button
-            onClick={() => onVerify?.(word.id)}
-            disabled={isLoading}
-            className="btn btn-approve"
-          >
-            {isLoading ? <span className="spinner" /> : "Approve"}
-          </button>
-          <button
             onClick={() => onReject?.(word.id)}
             disabled={isLoading}
             className="btn btn-outline-danger"
           >
             Decline
+          </button>
+          <button
+            onClick={() => onVerify?.(word.id)}
+            disabled={isLoading}
+            className="btn btn-approve"
+          >
+            {isLoading ? <span className="spinner" /> : "Approve"}
           </button>
         </div>
       )}

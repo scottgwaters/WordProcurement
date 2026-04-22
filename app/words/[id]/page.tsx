@@ -415,8 +415,16 @@ export default function WordDetailPage({
 
         {duplicates.length > 0 && (
           <div className="bg-[var(--warning-bg)] border border-[var(--warning)] px-4 py-3 rounded-lg mb-6 text-sm">
-            <div className="font-medium text-[var(--warning)] mb-2">
-              This spelling already exists elsewhere
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="font-medium text-[var(--warning)]">
+                This spelling already exists elsewhere
+              </div>
+              <Link
+                href={`/words/group/${encodeURIComponent(formData.word)}?from=${from ?? "words"}`}
+                className="btn btn-secondary text-xs whitespace-nowrap"
+              >
+                Edit all variants together →
+              </Link>
             </div>
             <ul className="space-y-1 text-[var(--text-primary)]">
               {duplicates.map((d) => (
@@ -439,6 +447,9 @@ export default function WordDetailPage({
                 </li>
               ))}
             </ul>
+            <p className="mt-2 text-xs text-[var(--text-secondary)]">
+              Use <span className="font-medium">Edit all variants together</span> to keep shared fields (definition, pronunciation, etc.) in sync across age groups.
+            </p>
           </div>
         )}
 
