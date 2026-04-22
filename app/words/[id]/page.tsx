@@ -26,6 +26,34 @@ export default function WordDetailPage({
   const [success, setSuccess] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityLogWithUser[]>([]);
   const [activityExpanded, setActivityExpanded] = useState(false);
+  // Cross-tier duplicates for this word's spelling (case-insensitive).
+  // Populated after the word loads so the reviewer can spot e.g. "DRAGON
+  // already lives in 10-12 / magic" before verifying a new copy.
+  type Duplicate = {
+    id: string;
+    word: string;
+    ageGroup: AgeGroup;
+    level: Level;
+    category: string;
+    verified: boolean;
+  };
+  const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
+  // Per-world word counts for the current age group, shown inline on each
+  // option in the World dropdown so the curator can see how full each
+  // world is before (re)assigning.
+  const [worldCounts, setWorldCounts] = useState<Record<WorldId, number> | null>(null);
+  // Controls the "Why this world?" popover next to the world badge.
+  const [showWhyWorld, setShowWhyWorld] = useState(false);
+  // Soft-lock state: if someone else is already editing this word, we
+  // show a read-only banner and disable the form rather than let two
+  // reviewers stomp on each other.
+  const [lockedBy, setLockedBy] = useState<string | null>(null);
+  // Optimistic concurrency: set on a 409 save. The banner offers to
+  // reload with the server's newer copy (discarding local edits) or
+  // keep editing (and overwrite on retry via a fresh version).
+  const [saveConflict, setSaveConflict] = useState<{
+    currentVersion: number;
+  } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -42,6 +70,9 @@ export default function WordDetailPage({
     pronunciation: "",
     heart_word_explanation: "",
   });
+  // Version token read from the server on load; echoed on PATCH so the
+  // server can reject our write if someone else saved first.
+  const [version, setVersion] = useState<number>(0);
 
   const router = useRouter();
   const { status } = useSession();
@@ -83,6 +114,7 @@ export default function WordDetailPage({
       pronunciation: data.pronunciation || "",
       heart_word_explanation: data.heart_word_explanation || "",
     });
+    setVersion(typeof data.version === "number" ? data.version : 0);
 
     setIsLoading(false);
     fetchActivity();
@@ -95,6 +127,97 @@ export default function WordDetailPage({
       fetchWord();
     }
   }, [status, fetchWord, router]);
+
+  // Once the word has loaded, check if the same spelling exists elsewhere.
+  // Re-runs if the reviewer renames the word so stale hits don't linger.
+  useEffect(() => {
+    const spelling = formData.word.trim();
+    if (!spelling || status !== "authenticated") {
+      setDuplicates([]);
+      return;
+    }
+    const controller = new AbortController();
+    (async () => {
+      const params = new URLSearchParams({
+        word: spelling,
+        excludeId: resolvedParams.id,
+      });
+      const res = await fetch(`/api/words/duplicates?${params}`, {
+        signal: controller.signal,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDuplicates(data.duplicates || []);
+      }
+    })().catch(() => {
+      // Ignore cancellation or network errors; duplicates are a hint, not a gate.
+    });
+    return () => controller.abort();
+  }, [formData.word, resolvedParams.id, status]);
+
+  // Soft-lock lifecycle: acquire the lease on mount, heartbeat every
+  // 60s to keep it alive while this tab is open, release on unmount.
+  // `navigator.sendBeacon` makes the release survive page navigation /
+  // tab close when the normal fetch would be killed mid-flight.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    const wordId = resolvedParams.id;
+    let cancelled = false;
+
+    const acquire = async () => {
+      try {
+        const res = await fetch(`/api/words/${wordId}/lease`, {
+          method: "POST",
+        });
+        if (cancelled) return;
+        if (res.status === 409) {
+          const data = await res.json().catch(() => ({}));
+          setLockedBy(data.heldBy || "another reviewer");
+        } else if (res.ok) {
+          setLockedBy(null);
+        }
+      } catch {
+        // Network blips are non-fatal; the heartbeat will retry.
+      }
+    };
+
+    acquire();
+    const interval = setInterval(acquire, 60_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      // Release so the next reviewer can pick up the word immediately on
+      // in-app navigation. If the browser tab is hard-closed this never
+      // runs; the lease times out on its own (3 min) — acceptable delay.
+      fetch(`/api/words/${wordId}/lease`, { method: "DELETE" }).catch(() => {});
+    };
+  }, [status, resolvedParams.id]);
+
+  // Load per-world counts for this word's age group so the World dropdown
+  // can show "Animal Kingdom · 47 at 7-9" style hints. Re-fetches when the
+  // age group changes.
+  useEffect(() => {
+    if (status !== "authenticated" || !formData.age_group) return;
+    const controller = new AbortController();
+    (async () => {
+      const params = new URLSearchParams({
+        ageGroup: formData.age_group,
+        byWorld: "1",
+      });
+      const res = await fetch(`/api/words/stats?${params}`, {
+        signal: controller.signal,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.countsByWorld) setWorldCounts(data.countsByWorld);
+      }
+    })().catch(() => {
+      // Counts are decorative; silent on errors.
+    });
+    return () => controller.abort();
+  }, [formData.age_group, status]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -116,6 +239,9 @@ export default function WordDetailPage({
       part_of_speech: formData.part_of_speech || null,
       pronunciation: formData.pronunciation || null,
       heart_word_explanation: formData.heart_word_explanation || null,
+      // Optimistic concurrency token — if the server moved past this
+      // version, it returns 409 instead of overwriting.
+      version,
     };
 
     const response = await fetch(`/api/words/${resolvedParams.id}`, {
@@ -124,14 +250,39 @@ export default function WordDetailPage({
       body: JSON.stringify(updateData),
     });
 
-    if (!response.ok) {
+    if (response.status === 409) {
+      const data = await response.json().catch(() => ({}));
+      setSaveConflict({
+        currentVersion:
+          typeof data.currentVersion === "number" ? data.currentVersion : version,
+      });
+    } else if (!response.ok) {
       setError("Failed to save changes");
     } else {
       setSuccess("Changes saved successfully");
+      setSaveConflict(null);
       fetchWord();
     }
 
     setIsSaving(false);
+  };
+
+  // Discard local edits and reload the server's latest copy. Used by the
+  // conflict banner "Reload" action.
+  const handleDiscardAndReload = () => {
+    setSaveConflict(null);
+    setError(null);
+    fetchWord();
+  };
+
+  // Keep the current edits but bump our version token to the server's
+  // latest so the next save goes through. Used when the reviewer has
+  // reviewed the remote changes and wants to proceed with their edit anyway.
+  const handleForceSave = () => {
+    if (saveConflict) {
+      setVersion(saveConflict.currentVersion);
+      setSaveConflict(null);
+    }
   };
 
   if (status === "loading" || isLoading) {
@@ -191,17 +342,105 @@ export default function WordDetailPage({
               </span>
               {(() => {
                 const a = worldForCategory(word.category);
-                return a.world ? (
-                  <span className="badge badge-neutral" title={a.world.tagline}>
-                    {a.world.emoji} {a.world.name}
+                const siblings = a.world
+                  ? CATEGORIES_BY_WORLD[a.world.id].filter((c) => c !== word.category)
+                  : [];
+                return (
+                  <span className="relative inline-flex items-center gap-1">
+                    {a.world ? (
+                      <span
+                        className="badge badge-neutral"
+                        title={`${a.world.tagline}\n\n${a.world.description}`}
+                      >
+                        {a.world.emoji} {a.world.name}
+                      </span>
+                    ) : (
+                      <span className="badge badge-warning" title={a.note}>
+                        ⚠ World: Mixed
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowWhyWorld((v) => !v)}
+                      className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-[var(--border)] text-[10px] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]"
+                      aria-label="Why this world?"
+                      aria-expanded={showWhyWorld}
+                    >
+                      ?
+                    </button>
+                    {showWhyWorld && (
+                      <div
+                        role="tooltip"
+                        className="absolute left-0 top-full mt-1 z-10 w-72 p-3 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] shadow-lg text-xs leading-relaxed text-[var(--text-primary)]"
+                      >
+                        <div className="mb-2">
+                          <span className="font-medium">Category</span>{" "}
+                          <code className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">
+                            {word.category}
+                          </code>{" "}
+                          →{" "}
+                          {a.world ? (
+                            <>
+                              <span>
+                                {a.world.emoji} {a.world.name}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[var(--warning)]">ambiguous</span>
+                          )}
+                        </div>
+                        {a.world && (
+                          <div className="mb-2 text-[var(--text-secondary)]">
+                            {a.world.description}
+                          </div>
+                        )}
+                        {siblings.length > 0 && (
+                          <div className="text-[var(--text-secondary)]">
+                            Other categories mapped to{" "}
+                            <span className="font-medium">{a.world?.name}</span>:{" "}
+                            {siblings.map((c) => c.replace(/_/g, " ")).join(", ")}
+                          </div>
+                        )}
+                        {a.note && !a.world && (
+                          <div className="text-[var(--warning)]">{a.note}</div>
+                        )}
+                      </div>
+                    )}
                   </span>
-                ) : (
-                  <span className="badge badge-warning" title={a.note}>⚠ World: Mixed</span>
                 );
               })()}
             </div>
           </div>
         </div>
+
+        {duplicates.length > 0 && (
+          <div className="bg-[var(--warning-bg)] border border-[var(--warning)] px-4 py-3 rounded-lg mb-6 text-sm">
+            <div className="font-medium text-[var(--warning)] mb-2">
+              This spelling already exists elsewhere
+            </div>
+            <ul className="space-y-1 text-[var(--text-primary)]">
+              {duplicates.map((d) => (
+                <li key={d.id} className="flex items-center gap-2">
+                  <Link
+                    href={`/words/${d.id}?from=${from ?? "words"}`}
+                    className="underline hover:no-underline"
+                  >
+                    {d.word}
+                  </Link>
+                  <span className="text-[var(--text-secondary)]">
+                    · ages {d.ageGroup} · level {d.level} ·{" "}
+                    {d.category.replace(/_/g, " ")}
+                  </span>
+                  {d.verified ? (
+                    <span className="badge badge-success">Verified</span>
+                  ) : (
+                    <span className="badge badge-warning">Pending</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {error && (
           <div className="bg-[var(--error-bg)] text-[var(--error)] px-4 py-3 rounded-lg mb-6 text-sm">
@@ -212,6 +451,43 @@ export default function WordDetailPage({
         {success && (
           <div className="bg-[var(--success-bg)] text-[var(--success)] px-4 py-3 rounded-lg mb-6 text-sm">
             {success}
+          </div>
+        )}
+
+        {lockedBy && (
+          <div className="bg-[var(--warning-bg)] text-[var(--text-primary)] border border-[var(--warning)] px-4 py-3 rounded-lg mb-6 text-sm">
+            <span className="font-medium text-[var(--warning)]">
+              {lockedBy} is editing this word right now.
+            </span>{" "}
+            You can view it but saving is blocked until their lease expires or they
+            navigate away.
+          </div>
+        )}
+
+        {saveConflict && (
+          <div className="bg-[var(--warning-bg)] text-[var(--text-primary)] border border-[var(--warning)] px-4 py-3 rounded-lg mb-6 text-sm">
+            <div className="font-medium text-[var(--warning)] mb-2">
+              Someone else saved changes to this word while you were editing.
+            </div>
+            <p className="text-[var(--text-secondary)] mb-3">
+              To avoid overwriting their work, pick one:
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleDiscardAndReload}
+                className="btn btn-secondary text-sm"
+              >
+                Discard my changes · reload theirs
+              </button>
+              <button
+                type="button"
+                onClick={handleForceSave}
+                className="btn btn-secondary text-sm"
+              >
+                Keep my changes · overwrite on next save
+              </button>
+            </div>
           </div>
         )}
 
@@ -250,15 +526,38 @@ export default function WordDetailPage({
                     }}
                     className="input"
                   >
-                    {Object.values(WORLDS).map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.emoji} {w.name}
-                      </option>
-                    ))}
+                    {Object.values(WORLDS).map((w) => {
+                      const count = worldCounts?.[w.id];
+                      const suffix =
+                        count !== undefined
+                          ? ` · ${count} at ${formData.age_group}`
+                          : "";
+                      return (
+                        <option
+                          key={w.id}
+                          value={w.id}
+                          title={w.description}
+                        >
+                          {w.emoji} {w.name}
+                          {suffix}
+                        </option>
+                      );
+                    })}
                   </select>
-                  <p className="text-xs mt-1 text-[var(--text-secondary)]">
-                    {worldForCategory(formData.category).world?.tagline}
-                  </p>
+                  {(() => {
+                    // Show the full description of the currently-selected world
+                    // so the reviewer has concrete examples of what belongs
+                    // there without having to hover a tooltip.
+                    const selected = worldForCategory(formData.category).world;
+                    return selected ? (
+                      <p className="text-xs mt-1 text-[var(--text-secondary)] leading-relaxed">
+                        <span className="font-medium text-[var(--text-primary)]">
+                          {selected.tagline}.
+                        </span>{" "}
+                        {selected.description}
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
@@ -471,7 +770,8 @@ export default function WordDetailPage({
             {/* Save button */}
             <button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !!lockedBy}
+              title={lockedBy ? `${lockedBy} is editing this word` : undefined}
               className="btn btn-primary w-full"
             >
               {isSaving ? (

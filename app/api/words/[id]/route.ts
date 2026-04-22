@@ -43,6 +43,9 @@ export async function GET(
     created_at: word.createdAt,
     created_by: word.createdById,
     source: word.source,
+    // Optimistic concurrency token — clients echo this on PATCH so two
+    // reviewers editing the same word can't silently overwrite each other.
+    version: word.version,
   };
 
   return NextResponse.json(response);
@@ -93,7 +96,40 @@ export async function PATCH(
     pronunciation,
     heart_word_explanation,
     source,
+    version: expectedVersion,
   } = body;
+
+  // Optimistic concurrency check — if the client read version N but the
+  // row is now at N+1, someone else already saved. Bail out with a 409 so
+  // the client can surface a conflict UI instead of blindly overwriting.
+  if (
+    typeof expectedVersion === "number" &&
+    expectedVersion !== existingWord.version
+  ) {
+    return NextResponse.json(
+      {
+        error: "This word was edited by someone else while you were making changes",
+        code: "version_conflict",
+        currentVersion: existingWord.version,
+        currentWord: {
+          id: existingWord.id,
+          word: existingWord.word,
+          age_group: existingWord.ageGroup,
+          level: existingWord.level,
+          category: existingWord.category,
+          hints: existingWord.hints,
+          pronunciation: existingWord.pronunciation,
+          part_of_speech: existingWord.partOfSpeech,
+          definition: existingWord.definition,
+          example_sentence: existingWord.exampleSentence,
+          heart_word_explanation: existingWord.heartWordExplanation,
+          source: existingWord.source,
+          version: existingWord.version,
+        },
+      },
+      { status: 409 }
+    );
+  }
 
   const updateData: Record<string, unknown> = {};
   const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -174,10 +210,36 @@ export async function PATCH(
     updateData.source = newVal;
   }
 
-  const updatedWord = await prisma.word.update({
-    where: { id: resolvedParams.id },
-    data: updateData,
+  // Bump version atomically against the read value. If another writer
+  // sneaks in between the pre-fetch above and this update (race window
+  // is tiny but possible), updateMany returns 0 rows and we 409.
+  const updateResult = await prisma.word.updateMany({
+    where: {
+      id: resolvedParams.id,
+      version: existingWord.version,
+    },
+    data: {
+      ...updateData,
+      version: { increment: 1 },
+    },
   });
+
+  if (updateResult.count === 0) {
+    return NextResponse.json(
+      {
+        error: "This word was edited by someone else while you were saving",
+        code: "version_conflict",
+      },
+      { status: 409 }
+    );
+  }
+
+  const updatedWord = await prisma.word.findUnique({
+    where: { id: resolvedParams.id },
+  });
+  if (!updatedWord) {
+    return NextResponse.json({ error: "Word disappeared" }, { status: 404 });
+  }
 
   // Only log activity if there were actual changes
   if (Object.keys(changes).length > 0) {
@@ -211,6 +273,7 @@ export async function PATCH(
     created_at: updatedWord.createdAt,
     created_by: updatedWord.createdById,
     source: updatedWord.source,
+    version: updatedWord.version,
   };
 
   return NextResponse.json(response);

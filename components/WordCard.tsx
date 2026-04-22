@@ -48,7 +48,7 @@ export default function WordCard({
             {assignment.world ? (
               <span
                 className="badge badge-meta-world"
-                title={assignment.world.tagline}
+                title={`${assignment.world.tagline}\n\n${assignment.world.description}`}
               >
                 {assignment.world.emoji} {assignment.world.name}
               </span>

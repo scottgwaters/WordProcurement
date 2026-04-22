@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   const level = searchParams.get("level");
   const verified = searchParams.get("verified");
   const search = searchParams.get("search");
+  const excludeLeased = searchParams.get("excludeLeased") === "1";
   const page = parseInt(searchParams.get("page") || "0");
   const pageSize = parseInt(searchParams.get("pageSize") || "50");
 
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
     level?: number;
     verified?: boolean;
     word?: { contains: string };
+    id?: { notIn: string[] };
   } = {};
 
   if (world && CATEGORIES_BY_WORLD[world]) {
@@ -50,6 +52,22 @@ export async function GET(request: NextRequest) {
   if (level) where.level = parseInt(level);
   if (verified !== null) where.verified = verified === "true";
   if (search) where.word = { contains: search };
+
+  // Soft-lock filter: when the caller asks (e.g. the review queue),
+  // exclude words that another reviewer is currently editing so two
+  // people don't land on the same word. Our own leases pass through.
+  if (excludeLeased) {
+    const otherLeases = await prisma.wordLease.findMany({
+      where: {
+        expiresAt: { gt: new Date() },
+        NOT: { userId: session.user.id },
+      },
+      select: { wordId: true },
+    });
+    if (otherLeases.length > 0) {
+      where.id = { notIn: otherLeases.map((l) => l.wordId) };
+    }
+  }
 
   const [words, total] = await Promise.all([
     prisma.word.findMany({

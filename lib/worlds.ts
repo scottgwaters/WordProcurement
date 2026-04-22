@@ -8,18 +8,78 @@ export interface World {
   id: WorldId;
   name: string;
   tagline: string;
+  /** One or two sentences explaining what belongs in this world. Shown as a
+   *  tooltip on world badges and as help text on the edit page so reviewers
+   *  can disambiguate edge-case words. */
+  description: string;
   emoji: string;
 }
 
 export const WORLDS: Record<WorldId, World> = {
-  animals:  { id: "animals",  name: "Animal Kingdom",    tagline: "Wild creatures, pets & bugs",     emoji: "🐾" },
-  food:     { id: "food",     name: "Kitchen Quest",     tagline: "Food, drinks & kitchen fun",      emoji: "🧁" },
-  nature:   { id: "nature",   name: "Nature Trail",      tagline: "Outdoors, weather & earth",       emoji: "🌳" },
-  space:    { id: "space",    name: "Star Mission",      tagline: "Planets, stars & rockets",        emoji: "🚀" },
-  objects:  { id: "objects",  name: "Treasure Hunt",     tagline: "Everyday things around you",      emoji: "🎁" },
-  magic:    { id: "magic",    name: "Enchanted Words",   tagline: "Unicorns, wizards & fairy tales", emoji: "✨" },
-  sight:    { id: "sight",    name: "Sight Word School", tagline: "Common words for faster reading", emoji: "📖" },
-  feelings: { id: "feelings", name: "Feelings Forest",   tagline: "Emotions & how we feel",          emoji: "💗" },
+  animals: {
+    id: "animals",
+    name: "Animal Kingdom",
+    tagline: "Wild creatures, pets & bugs",
+    description:
+      "Living creatures and the humans around them — pets, wild animals, insects, plus family and people words (mom, friend, baby). Anything that breathes.",
+    emoji: "🐾",
+  },
+  food: {
+    id: "food",
+    name: "Kitchen Quest",
+    tagline: "Food, drinks & kitchen fun",
+    description:
+      "Edible things, cooking, and the body — food, drinks, meals, kitchen items, and body parts like hand, foot, tooth.",
+    emoji: "🧁",
+  },
+  nature: {
+    id: "nature",
+    name: "Nature Trail",
+    tagline: "Outdoors, weather & earth",
+    description:
+      "The outdoors — plants, trees, landscapes, weather, seasons, and outdoor sports or activities (hike, swim, camp).",
+    emoji: "🌳",
+  },
+  space: {
+    id: "space",
+    name: "Star Mission",
+    tagline: "Planets, stars & rockets",
+    description:
+      "Space and science — planets, stars, rockets, astronauts, plus broader science concepts (atom, magnet, gravity).",
+    emoji: "🚀",
+  },
+  objects: {
+    id: "objects",
+    name: "Treasure Hunt",
+    tagline: "Everyday things around you",
+    description:
+      "Man-made objects — household items, furniture, clothing, vehicles, tools. Things kids touch and use every day.",
+    emoji: "🎁",
+  },
+  magic: {
+    id: "magic",
+    name: "Enchanted Words",
+    tagline: "Unicorns, wizards & fairy tales",
+    description:
+      "Imagination and creativity — magic, fairy tales, adventure, music and the arts, and abstract concepts (dream, idea, story).",
+    emoji: "✨",
+  },
+  sight: {
+    id: "sight",
+    name: "Sight Word School",
+    tagline: "Common words for faster reading",
+    description:
+      "High-frequency sight words and heart words — the building blocks of early reading (the, you, said, because). These don't fit a theme; they're taught for recognition.",
+    emoji: "📖",
+  },
+  feelings: {
+    id: "feelings",
+    name: "Feelings Forest",
+    tagline: "Emotions & how we feel",
+    description:
+      "Emotions and emotional states — happy, scared, proud, lonely. Words that name what's going on inside.",
+    emoji: "💗",
+  },
 };
 
 // Inverse of worldForCategory — used to group/filter categories by world.

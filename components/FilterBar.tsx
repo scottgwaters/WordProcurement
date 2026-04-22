@@ -40,10 +40,17 @@ export default function FilterBar({ filters, onChange, showStatus = true }: Filt
         onChange={(e) => onChange({ ...filters, world: e.target.value || undefined, category: undefined })}
         className={selectCls}
         aria-label="Filter by world"
+        title={
+          filters.world
+            ? `${WORLDS[filters.world as keyof typeof WORLDS]?.tagline}. ${WORLDS[filters.world as keyof typeof WORLDS]?.description}`
+            : "Filter words by in-game world"
+        }
       >
         <option value="">All worlds</option>
         {Object.values(WORLDS).map((w) => (
-          <option key={w.id} value={w.id}>{w.name}</option>
+          <option key={w.id} value={w.id} title={w.description}>
+            {w.emoji} {w.name}
+          </option>
         ))}
       </select>
 

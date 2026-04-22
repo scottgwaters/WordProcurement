@@ -18,6 +18,7 @@ model User {
   verifiedWords  Word[]         @relation("VerifiedBy")
   activityLogs   ActivityLog[]
   invitesCreated InviteToken[]  @relation("InvitedBy")
+  wordLeases     WordLease[]
 
   @@map("users")
 }
@@ -59,12 +60,37 @@ model Word {
   createdBy            User?     @relation("CreatedBy", fields: [createdById], references: [id])
   source               String?
 
+  // Monotonically increasing counter for optimistic concurrency. PATCH
+  // callers include the version they read; the server refuses the write
+  // (409) if it has moved on, so two concurrent editors can't silently
+  // overwrite each other.
+  version              Int       @default(0)
+
   activityLogs ActivityLog[]
+  lease        WordLease?
 
   @@index([category])
   @@index([ageGroup])
   @@index([verified])
   @@map("words")
+}
+
+// Soft lock on a word while a reviewer is actively editing it. The review
+// queue filters out words held by other users so two reviewers don't
+// duplicate effort. Short TTL (~3 min) keeps things self-healing: if a
+// tab dies without releasing, the lease expires and the word re-enters
+// circulation automatically.
+model WordLease {
+  wordId     String   @id @map("word_id")
+  word       Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  acquiredAt DateTime @default(now()) @map("acquired_at")
+  expiresAt  DateTime @map("expires_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("word_leases")
 }
 
 model ActivityLog {
