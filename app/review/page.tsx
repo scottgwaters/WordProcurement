@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import WordCard from "@/components/WordCard";
@@ -21,6 +21,25 @@ export default function ReviewPage() {
     total: 0,
     verifiedToday: 0,
   });
+  // "Undo last action" state — after an approve or decline, we stash the
+  // word + action so the reviewer can back out if they clicked the wrong
+  // button. Cleared on the next action or on navigation.
+  type LastAction = {
+    word: Word;
+    action: "approve" | "decline";
+    index: number; // where to reinsert on undo
+  };
+  const [lastAction, setLastAction] = useState<LastAction | null>(null);
+
+  // Refs mirror the active word so fetchWords can preserve position on a
+  // background refetch without putting words/currentIndex in its deps
+  // (which would loop the mount effect).
+  const wordsRef = useRef<Word[]>([]);
+  const currentIndexRef = useRef(0);
+  useEffect(() => {
+    wordsRef.current = words;
+    currentIndexRef.current = currentIndex;
+  }, [words, currentIndex]);
 
   const router = useRouter();
   const { status } = useSession();
@@ -44,11 +63,29 @@ export default function ReviewPage() {
     if (filters.flagged) params.set("flagged", "true");
     if (filters.search) params.set("search", filters.search);
 
+    // Remember where the reviewer was so a background refetch doesn't
+    // dump them back to word 1. If the current word is still in the queue
+    // we keep their position; otherwise we clamp to the nearest valid index.
+    const anchorId = wordsRef.current[currentIndexRef.current]?.id;
+
     const response = await fetch(`/api/words?${params.toString()}`);
     if (response.ok) {
       const data = await response.json();
-      setWords(data.words || []);
-      setCurrentIndex(0);
+      const nextWords: Word[] = data.words || [];
+      setWords(nextWords);
+      if (anchorId) {
+        const idx = nextWords.findIndex((w) => w.id === anchorId);
+        setCurrentIndex(
+          idx >= 0
+            ? idx
+            : Math.min(
+                currentIndexRef.current,
+                Math.max(0, nextWords.length - 1)
+              )
+        );
+      } else {
+        setCurrentIndex(0);
+      }
     }
 
     // Get stats — include today's count so the progress bar can show momentum.
@@ -74,6 +111,30 @@ export default function ReviewPage() {
     }
   }, [status, fetchWords, router]);
 
+  // Keep the queue fresh: another reviewer may have approved/rejected
+  // words since this tab loaded. Refetch when the tab regains focus and
+  // once a minute while active. Skips refetch during an in-flight action
+  // so the current word doesn't get shuffled under the reviewer.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const refresh = () => {
+      if (!isActing && document.visibilityState === "visible") {
+        fetchWords();
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = setInterval(refresh, 60_000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(interval);
+    };
+  }, [status, isActing, fetchWords]);
+
   const handleVerify = async (wordId: string) => {
     setIsActing(true);
 
@@ -84,6 +145,8 @@ export default function ReviewPage() {
     });
 
     if (response.ok) {
+      const word = words.find((w) => w.id === wordId);
+      const idx = words.findIndex((w) => w.id === wordId);
       setWords((prev) => prev.filter((w) => w.id !== wordId));
       setStats((prev) => ({
         ...prev,
@@ -91,6 +154,7 @@ export default function ReviewPage() {
         remaining: prev.remaining - 1,
         verifiedToday: prev.verifiedToday + 1,
       }));
+      if (word) setLastAction({ word, action: "approve", index: idx });
     }
 
     setIsActing(false);
@@ -105,12 +169,56 @@ export default function ReviewPage() {
       body: JSON.stringify({ verified: false }),
     });
 
+    const word = words.find((w) => w.id === wordId);
+    const idx = words.findIndex((w) => w.id === wordId);
     setWords((prev) => prev.filter((w) => w.id !== wordId));
     setStats((prev) => ({
       ...prev,
       remaining: prev.remaining - 1,
     }));
+    if (word) setLastAction({ word, action: "decline", index: idx });
 
+    setIsActing(false);
+  };
+
+  // Undo the last approve/decline. Approves are reverted via the verify
+  // endpoint (flip verified back to false); declines didn't persist a
+  // state change on the word, so undo just puts the word back into the
+  // local queue. The word lands at its original index so the reviewer's
+  // position in the list isn't shuffled.
+  const handleUndo = async () => {
+    if (!lastAction || isActing) return;
+    setIsActing(true);
+
+    if (lastAction.action === "approve") {
+      await fetch(`/api/words/${lastAction.word.id}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verified: false }),
+      });
+      setStats((prev) => ({
+        ...prev,
+        reviewed: Math.max(0, prev.reviewed - 1),
+        remaining: prev.remaining + 1,
+        verifiedToday: Math.max(0, prev.verifiedToday - 1),
+      }));
+    } else {
+      setStats((prev) => ({
+        ...prev,
+        remaining: prev.remaining + 1,
+      }));
+    }
+
+    setWords((prev) => {
+      const next = [...prev];
+      const insertAt = Math.min(Math.max(lastAction.index, 0), next.length);
+      next.splice(insertAt, 0, { ...lastAction.word, verified: false });
+      return next;
+    });
+    setCurrentIndex((prev) =>
+      Math.min(Math.max(lastAction.index, 0), prev + 1)
+    );
+    setLastAction(null);
     setIsActing(false);
   };
 
@@ -167,9 +275,17 @@ export default function ReviewPage() {
       ) {
         return;
       }
-      if (!currentWord || isActing) return;
 
       const key = e.key.toLowerCase();
+      // Undo is always available when there's a pending lastAction, even
+      // between words. All other shortcuts need a current word.
+      if (key === "u" && lastAction && !isActing) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+      if (!currentWord || isActing) return;
+
       if (key === "a") {
         e.preventDefault();
         handleVerify(currentWord.id);
@@ -195,7 +311,7 @@ export default function ReviewPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [currentWord, isActing, words.length]);
+  }, [currentWord, isActing, words.length, lastAction]);
 
   if (status === "loading") {
     return (
@@ -277,10 +393,42 @@ export default function ReviewPage() {
           flag ·{" "}
           <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">S</kbd>{" "}
           skip ·{" "}
+          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">U</kbd>{" "}
+          undo ·{" "}
           <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">J</kbd>/
           <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">K</kbd>{" "}
           next/prev
         </div>
+
+        {lastAction && (
+          <div className="flex items-center justify-between gap-3 mb-4 px-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] text-sm">
+            <div>
+              <span className="text-[var(--text-secondary)]">Last action:</span>{" "}
+              <span className="font-medium text-[var(--text-primary)]">
+                {lastAction.action === "approve" ? "Approved" : "Declined"}{" "}
+                {lastAction.word.word}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={isActing}
+                className="btn btn-secondary text-xs"
+              >
+                Undo (U)
+              </button>
+              <button
+                type="button"
+                onClick={() => setLastAction(null)}
+                className="btn btn-ghost text-xs"
+                aria-label="Dismiss undo"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
 
         <FilterBar
           filters={filters}
