@@ -23,12 +23,16 @@ export async function POST(
     );
   }
 
+  // Verifying a word also clears any declined state — changing a previous
+  // decline to an approve should move the row fully into the verified pool
+  // in one click, not leave it stuck as "declined AND verified".
   const updatedWord = await prisma.word.update({
     where: { id: resolvedParams.id },
     data: {
       verified,
       verifiedAt: verified ? new Date() : null,
       verifiedById: verified ? session.user.id : null,
+      ...(verified ? { declined: false, declinedAt: null } : {}),
     },
   });
 

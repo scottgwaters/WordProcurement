@@ -21,15 +21,6 @@ export default function ReviewPage() {
     total: 0,
     verifiedToday: 0,
   });
-  // "Undo last action" state — after an approve or decline, we stash the
-  // word + action so the reviewer can back out if they clicked the wrong
-  // button. Cleared on the next action or on navigation.
-  type LastAction = {
-    word: Word;
-    action: "approve" | "decline";
-    index: number; // where to reinsert on undo
-  };
-  const [lastAction, setLastAction] = useState<LastAction | null>(null);
 
   // Refs mirror the active word so fetchWords can preserve position on a
   // background refetch without putting words/currentIndex in its deps
@@ -45,63 +36,99 @@ export default function ReviewPage() {
   const { status } = useSession();
   const dlg = useDialog();
 
-  const fetchWords = useCallback(async () => {
-    if (status !== "authenticated") return;
+  const fetchWords = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (status !== "authenticated") return;
 
-    setIsLoading(true);
+      // Silent mode skips the spinner flash on background/poll refreshes.
+      // Only the initial load and filter-change refetches should show the
+      // loading state.
+      const silent = opts?.silent ?? false;
+      if (!silent) setIsLoading(true);
 
-    const params = new URLSearchParams();
-    params.set("verified", "false");
-    params.set("pageSize", "50");
-    // Skip words another reviewer is actively editing so two people don't
-    // land on the same pending word.
-    params.set("excludeLeased", "1");
-    if (filters.world) params.set("world", filters.world);
-    else if (filters.category) params.set("category", filters.category);
-    if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
-    if (filters.level) params.set("level", String(filters.level));
-    if (filters.flagged) params.set("flagged", "true");
-    if (filters.search) params.set("search", filters.search);
+      const params = new URLSearchParams();
+      params.set("verified", "false");
+      params.set("pageSize", "50");
+      // Skip words another reviewer is actively editing so two people don't
+      // land on the same pending word.
+      params.set("excludeLeased", "1");
+      if (filters.world) params.set("world", filters.world);
+      else if (filters.category) params.set("category", filters.category);
+      if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
+      if (filters.level) params.set("level", String(filters.level));
+      if (filters.flagged) params.set("flagged", "true");
+      if (filters.search) params.set("search", filters.search);
 
-    // Remember where the reviewer was so a background refetch doesn't
-    // dump them back to word 1. If the current word is still in the queue
-    // we keep their position; otherwise we clamp to the nearest valid index.
-    const anchorId = wordsRef.current[currentIndexRef.current]?.id;
+      // Anchor by the current word's id so a background refetch doesn't
+      // dump the reviewer back to word 1.
+      const anchorId = wordsRef.current[currentIndexRef.current]?.id;
 
-    const response = await fetch(`/api/words?${params.toString()}`);
-    if (response.ok) {
-      const data = await response.json();
-      const nextWords: Word[] = data.words || [];
-      setWords(nextWords);
-      if (anchorId) {
-        const idx = nextWords.findIndex((w) => w.id === anchorId);
-        setCurrentIndex(
-          idx >= 0
-            ? idx
-            : Math.min(
-                currentIndexRef.current,
-                Math.max(0, nextWords.length - 1)
-              )
-        );
-      } else {
-        setCurrentIndex(0);
+      const response = await fetch(`/api/words?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        const serverWords: Word[] = data.words || [];
+
+        if (silent) {
+          // Merge: keep words the reviewer has already acted on this
+          // session (so Previous can still navigate back to them), keep
+          // local pending rows still in the server response, and append
+          // any newly-pending words the server returned.
+          const localActed = wordsRef.current.filter(
+            (w) => w.verified || w.declined
+          );
+          const actedIds = new Set(localActed.map((w) => w.id));
+          const serverIds = new Set(serverWords.map((w) => w.id));
+          const localPending = wordsRef.current.filter(
+            (w) => !w.verified && !w.declined && serverIds.has(w.id)
+          );
+          const localIds = new Set(
+            [...localActed, ...localPending].map((w) => w.id)
+          );
+          const newFromServer = serverWords.filter(
+            (w) => !localIds.has(w.id) && !actedIds.has(w.id)
+          );
+          const merged = [...localActed, ...localPending, ...newFromServer];
+          setWords(merged);
+
+          if (anchorId) {
+            const idx = merged.findIndex((w) => w.id === anchorId);
+            if (idx >= 0) setCurrentIndex(idx);
+          }
+        } else {
+          // Fresh load or filter-change: take server ordering as truth.
+          setWords(serverWords);
+          if (anchorId) {
+            const idx = serverWords.findIndex((w) => w.id === anchorId);
+            setCurrentIndex(
+              idx >= 0
+                ? idx
+                : Math.min(
+                    currentIndexRef.current,
+                    Math.max(0, serverWords.length - 1)
+                  )
+            );
+          } else {
+            setCurrentIndex(0);
+          }
+        }
       }
-    }
 
-    // Get stats — include today's count so the progress bar can show momentum.
-    const statsResponse = await fetch("/api/words/stats?today=1");
-    if (statsResponse.ok) {
-      const statsData = await statsResponse.json();
-      setStats({
-        reviewed: statsData.verifiedWords || 0,
-        remaining: statsData.unverifiedWords || 0,
-        total: statsData.totalWords || 0,
-        verifiedToday: statsData.verifiedToday || 0,
-      });
-    }
+      // Stats — include today's count so the progress bar can show momentum.
+      const statsResponse = await fetch("/api/words/stats?today=1");
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setStats({
+          reviewed: statsData.verifiedWords || 0,
+          remaining: statsData.unverifiedWords || 0,
+          total: statsData.totalWords || 0,
+          verifiedToday: statsData.verifiedToday || 0,
+        });
+      }
 
-    setIsLoading(false);
-  }, [status, filters]);
+      if (!silent) setIsLoading(false);
+    },
+    [status, filters]
+  );
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -113,13 +140,13 @@ export default function ReviewPage() {
 
   // Keep the queue fresh: another reviewer may have approved/rejected
   // words since this tab loaded. Refetch when the tab regains focus and
-  // once a minute while active. Skips refetch during an in-flight action
-  // so the current word doesn't get shuffled under the reviewer.
+  // once a minute while active — silently, so the word card doesn't flash
+  // a spinner under the reviewer.
   useEffect(() => {
     if (status !== "authenticated") return;
     const refresh = () => {
       if (!isActing && document.visibilityState === "visible") {
-        fetchWords();
+        fetchWords({ silent: true });
       }
     };
     const onVisible = () => {
@@ -135,8 +162,28 @@ export default function ReviewPage() {
     };
   }, [status, isActing, fetchWords]);
 
+  // Advance to the next pending word (skipping any words the reviewer has
+  // already acted on in this session). Falls through to the literal next
+  // index if there's nothing pending ahead, so Previous still works.
+  const advanceToNextPending = () => {
+    const list = wordsRef.current;
+    const cursor = currentIndexRef.current;
+    for (let i = cursor + 1; i < list.length; i++) {
+      if (!list[i].verified && !list[i].declined) {
+        setCurrentIndex(i);
+        return;
+      }
+    }
+    // No pending left ahead — just land on the next index so the reviewer
+    // sees the "acted on" state of what they just decided.
+    setCurrentIndex(Math.min(cursor + 1, list.length - 1));
+  };
+
   const handleVerify = async (wordId: string) => {
     setIsActing(true);
+    const current = words.find((w) => w.id === wordId);
+    const wasPending = !!current && !current.verified && !current.declined;
+    const wasDeclined = !!current?.declined;
 
     const response = await fetch(`/api/words/${wordId}/verify`, {
       method: "POST",
@@ -145,16 +192,36 @@ export default function ReviewPage() {
     });
 
     if (response.ok) {
-      const word = words.find((w) => w.id === wordId);
-      const idx = words.findIndex((w) => w.id === wordId);
-      setWords((prev) => prev.filter((w) => w.id !== wordId));
-      setStats((prev) => ({
-        ...prev,
-        reviewed: prev.reviewed + 1,
-        remaining: prev.remaining - 1,
-        verifiedToday: prev.verifiedToday + 1,
-      }));
-      if (word) setLastAction({ word, action: "approve", index: idx });
+      // Mark in place — don't shrink the list, so Previous can land on it.
+      setWords((prev) =>
+        prev.map((w) =>
+          w.id === wordId ? { ...w, verified: true, declined: false } : w
+        )
+      );
+      // Stats delta depends on the previous state:
+      //   pending  → verified: reviewed +1, remaining -1
+      //   declined → verified: reviewed +1 (no remaining change since declined was already out of the pending pool)
+      //   approved → approved: no change
+      setStats((prev) => {
+        if (wasPending) {
+          return {
+            ...prev,
+            reviewed: prev.reviewed + 1,
+            remaining: Math.max(0, prev.remaining - 1),
+            verifiedToday: prev.verifiedToday + 1,
+          };
+        }
+        if (wasDeclined) {
+          return {
+            ...prev,
+            reviewed: prev.reviewed + 1,
+            total: prev.total + 1, // re-entering the active pool
+            verifiedToday: prev.verifiedToday + 1,
+          };
+        }
+        return prev;
+      });
+      advanceToNextPending();
     }
 
     setIsActing(false);
@@ -162,71 +229,42 @@ export default function ReviewPage() {
 
   const handleReject = async (wordId: string) => {
     setIsActing(true);
+    const current = words.find((w) => w.id === wordId);
+    const wasPending = !!current && !current.verified && !current.declined;
+    const wasVerified = !!current?.verified;
 
-    // Decline is a soft-delete now — the word drops out of the review
-    // queue permanently unless someone explicitly un-declines it.
     await fetch(`/api/words/${wordId}/decline`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ declined: true }),
     });
 
-    const word = words.find((w) => w.id === wordId);
-    const idx = words.findIndex((w) => w.id === wordId);
-    setWords((prev) => prev.filter((w) => w.id !== wordId));
-    setStats((prev) => ({
-      ...prev,
-      remaining: prev.remaining - 1,
-    }));
-    if (word) setLastAction({ word, action: "decline", index: idx });
-
-    setIsActing(false);
-  };
-
-  // Undo the last approve/decline. Approves are reverted via the verify
-  // endpoint (flip verified back to false); declines didn't persist a
-  // state change on the word, so undo just puts the word back into the
-  // local queue. The word lands at its original index so the reviewer's
-  // position in the list isn't shuffled.
-  const handleUndo = async () => {
-    if (!lastAction || isActing) return;
-    setIsActing(true);
-
-    if (lastAction.action === "approve") {
-      await fetch(`/api/words/${lastAction.word.id}/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verified: false }),
-      });
-      setStats((prev) => ({
-        ...prev,
-        reviewed: Math.max(0, prev.reviewed - 1),
-        remaining: prev.remaining + 1,
-        verifiedToday: Math.max(0, prev.verifiedToday - 1),
-      }));
-    } else {
-      // Un-decline to put the word back into the pending pool.
-      await fetch(`/api/words/${lastAction.word.id}/decline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ declined: false }),
-      });
-      setStats((prev) => ({
-        ...prev,
-        remaining: prev.remaining + 1,
-      }));
-    }
-
-    setWords((prev) => {
-      const next = [...prev];
-      const insertAt = Math.min(Math.max(lastAction.index, 0), next.length);
-      next.splice(insertAt, 0, { ...lastAction.word, verified: false });
-      return next;
-    });
-    setCurrentIndex((prev) =>
-      Math.min(Math.max(lastAction.index, 0), prev + 1)
+    // Mark in place — don't shrink the list, so Previous can land on it.
+    setWords((prev) =>
+      prev.map((w) =>
+        w.id === wordId ? { ...w, declined: true, verified: false } : w
+      )
     );
-    setLastAction(null);
+    setStats((prev) => {
+      if (wasPending) {
+        return {
+          ...prev,
+          remaining: Math.max(0, prev.remaining - 1),
+          total: Math.max(0, prev.total - 1), // declined rows drop out of total
+        };
+      }
+      if (wasVerified) {
+        return {
+          ...prev,
+          reviewed: Math.max(0, prev.reviewed - 1),
+          total: Math.max(0, prev.total - 1),
+          verifiedToday: Math.max(0, prev.verifiedToday - 1),
+        };
+      }
+      return prev;
+    });
+    advanceToNextPending();
+
     setIsActing(false);
   };
 
@@ -309,13 +347,6 @@ export default function ReviewPage() {
       }
 
       const key = e.key.toLowerCase();
-      // Undo is always available when there's a pending lastAction, even
-      // between words. All other shortcuts need a current word.
-      if (key === "u" && lastAction && !isActing) {
-        e.preventDefault();
-        handleUndo();
-        return;
-      }
       if (!currentWord || isActing) return;
 
       if (key === "a") {
@@ -343,7 +374,7 @@ export default function ReviewPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [currentWord, isActing, words.length, lastAction]);
+  }, [currentWord, isActing, words.length]);
 
   if (status === "loading") {
     return (
@@ -386,6 +417,7 @@ export default function ReviewPage() {
               </div>
               <div className="text-xs text-[var(--text-secondary)]">Remaining</div>
             </div>
+            <ShortcutsHelp />
           </div>
         </div>
 
@@ -408,56 +440,6 @@ export default function ReviewPage() {
                   width: `${Math.round((stats.reviewed / stats.total) * 100)}%`,
                 }}
               />
-            </div>
-          </div>
-        )}
-
-        {/* Keyboard shortcut hint — discoverable but unobtrusive. */}
-        <div className="text-xs text-[var(--text-secondary)] mb-4" aria-hidden>
-          <span className="font-medium">Shortcuts:</span>{" "}
-          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">A</kbd>{" "}
-          approve ·{" "}
-          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">D</kbd>{" "}
-          decline ·{" "}
-          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">E</kbd>{" "}
-          edit ·{" "}
-          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">F</kbd>{" "}
-          flag ·{" "}
-          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">S</kbd>{" "}
-          skip ·{" "}
-          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">U</kbd>{" "}
-          undo ·{" "}
-          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">J</kbd>/
-          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">K</kbd>{" "}
-          next/prev
-        </div>
-
-        {lastAction && (
-          <div className="flex items-center justify-between gap-3 mb-4 px-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] text-sm">
-            <div>
-              <span className="text-[var(--text-secondary)]">Last action:</span>{" "}
-              <span className="font-medium text-[var(--text-primary)]">
-                {lastAction.action === "approve" ? "Approved" : "Declined"}{" "}
-                {lastAction.word.word}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleUndo}
-                disabled={isActing}
-                className="btn btn-secondary text-xs"
-              >
-                Undo (U)
-              </button>
-              <button
-                type="button"
-                onClick={() => setLastAction(null)}
-                className="btn btn-ghost text-xs"
-                aria-label="Dismiss undo"
-              >
-                ×
-              </button>
             </div>
           </div>
         )}
@@ -488,6 +470,18 @@ export default function ReviewPage() {
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm text-[var(--text-secondary)]">
                   Word {currentIndex + 1} of {words.length}
+                  {(() => {
+                    const pending = words.filter(
+                      (w) => !w.verified && !w.declined
+                    ).length;
+                    return pending !== words.length ? (
+                      <>
+                        {" "}
+                        · <span className="font-medium">{pending}</span> still
+                        pending
+                      </>
+                    ) : null;
+                  })()}
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -496,6 +490,12 @@ export default function ReviewPage() {
                     className="btn btn-secondary text-sm"
                   >
                     Previous
+                    <kbd
+                      aria-hidden
+                      className="ml-1 px-1 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-mono text-[10px] leading-none"
+                    >
+                      K
+                    </kbd>
                   </button>
                   <button
                     onClick={() =>
@@ -505,6 +505,12 @@ export default function ReviewPage() {
                     className="btn btn-secondary text-sm"
                   >
                     Next
+                    <kbd
+                      aria-hidden
+                      className="ml-1 px-1 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-mono text-[10px] leading-none"
+                    >
+                      J
+                    </kbd>
                   </button>
                 </div>
               </div>
@@ -513,6 +519,7 @@ export default function ReviewPage() {
                 <WordCard
                   word={currentWord}
                   showActions
+                  showShortcuts
                   onVerify={handleVerify}
                   onReject={handleReject}
                   onEdit={handleEdit}
@@ -525,6 +532,77 @@ export default function ReviewPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+// Small ?-icon in the header that reveals the full list of keyboard
+// shortcuts on hover or focus. Keeps the info discoverable without a full
+// ribbon of text at the top of the page.
+function ShortcutsHelp() {
+  const [open, setOpen] = useState(false);
+  const shortcuts: Array<[string, string]> = [
+    ["A", "Approve"],
+    ["D", "Decline"],
+    ["E", "Edit word"],
+    ["F", "Flag for review"],
+    ["S", "Skip"],
+    ["J", "Next word"],
+    ["K", "Previous word"],
+  ];
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
+        aria-label="Keyboard shortcuts"
+        aria-expanded={open}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          role="tooltip"
+          className="absolute right-0 top-full mt-2 z-10 w-56 p-3 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] shadow-lg text-xs"
+        >
+          <div className="font-semibold text-[var(--text-primary)] mb-2">
+            Keyboard shortcuts
+          </div>
+          <ul className="space-y-1.5">
+            {shortcuts.map(([key, label]) => (
+              <li
+                key={key}
+                className="flex items-center justify-between text-[var(--text-secondary)]"
+              >
+                <span>{label}</span>
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--text-primary)] font-mono text-[10px]">
+                  {key}
+                </kbd>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

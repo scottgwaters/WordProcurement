@@ -35,6 +35,13 @@
   --error:   #A85048;  --error-bg:   #F3DEDB;
   --info:    #5E7A93;  --info-bg:    #DFE7EE;
 
+  /* Primary confirm / approve — Ocean Teal. Dedicated from `--success` so
+     approval actions can own a bolder, saturated token while informational
+     success badges stay muted sage. Any "approve" or "primary success"
+     button should pull from these. */
+  --approve:        #1A9E8F;
+  --approve-hover:  #0E8A7A;
+
   /* Elevation — subtle only */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -142,11 +149,13 @@ body {
 }
 .btn-tertiary:hover { text-decoration: underline; }
 
+/* Primary success button — same Ocean Teal as btn-approve so any
+   positive-confirmation action across the app reads consistently. */
 .btn-success {
-  background: var(--success);
+  background: var(--approve);
   color: #FFFFFF;
 }
-.btn-success:hover { background: color-mix(in srgb, var(--success) 85%, black); }
+.btn-success:hover { background: var(--approve-hover); }
 
 .btn-danger {
   background: var(--error);
@@ -154,15 +163,15 @@ body {
 }
 .btn-danger:hover { background: color-mix(in srgb, var(--error) 85%, black); }
 
-/* Approve — vivid green, dominant primary. Dedicated variant so the sage accent
-   stays muted elsewhere and Approve carries real "go" weight. */
+/* Approve — Ocean Teal primary confirm. Pulls from the shared
+   --approve token so btn-success and btn-approve always match. */
 .btn-approve {
-  background: #16A34A;   /* green-600 */
+  background: var(--approve);
   color: #FFFFFF;
   min-width: 140px;
 }
-.btn-approve:hover { background: #15803D; } /* green-700 */
-.btn-approve:active { background: #166534; } /* green-800 */
+.btn-approve:hover  { background: var(--approve-hover); }
+.btn-approve:active { background: var(--approve-hover); }
 
 /* Outlined danger — demotes Reject so Approve dominates, but keeps the red
    semantic signal for accessibility (color + outline + label). */

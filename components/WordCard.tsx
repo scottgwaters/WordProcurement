@@ -13,6 +13,22 @@ interface WordCardProps {
   onFlag?: (wordId: string) => void;
   onSkip?: () => void;
   isLoading?: boolean;
+  /** Show small keyboard-shortcut pills (A/D/E/F/S) next to each action.
+   *  Enabled on /review where the page wires up those bindings. */
+  showShortcuts?: boolean;
+}
+
+// Small grey pill rendered next to an action label so the keyboard
+// shortcut is attached to the action rather than listed separately.
+function ShortcutPill({ keyLabel }: { keyLabel: string }) {
+  return (
+    <kbd
+      aria-hidden
+      className="ml-1 px-1 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-mono text-[10px] leading-none"
+    >
+      {keyLabel}
+    </kbd>
+  );
 }
 
 export default function WordCard({
@@ -24,6 +40,7 @@ export default function WordCard({
   onFlag,
   onSkip,
   isLoading = false,
+  showShortcuts = false,
 }: WordCardProps) {
   const assignment = worldForCategory(word.category);
   return (
@@ -68,7 +85,14 @@ export default function WordCard({
           )}
         </div>
         <div className="flex flex-col items-end gap-1">
-          {word.verified ? (
+          {word.declined ? (
+            <span
+              className="badge badge-error"
+              title="You declined this — clicking Approve will restore it"
+            >
+              Declined
+            </span>
+          ) : word.verified ? (
             <span className="badge badge-success">Verified</span>
           ) : (
             <span className="badge badge-warning">Pending</span>
@@ -124,6 +148,7 @@ export default function WordCard({
             aria-label="Skip this word"
           >
             Skip
+            {showShortcuts && <ShortcutPill keyLabel="S" />}
           </button>
           <button
             onClick={() => onEdit?.(word.id)}
@@ -136,6 +161,7 @@ export default function WordCard({
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
             Edit
+            {showShortcuts && <ShortcutPill keyLabel="E" />}
           </button>
           {onFlag && (
             <button
@@ -173,6 +199,7 @@ export default function WordCard({
                 <line x1="4" y1="22" x2="4" y2="15" />
               </svg>
               {word.flagged ? "Flagged" : "Flag"}
+              {showShortcuts && <ShortcutPill keyLabel="F" />}
             </button>
           )}
           <div className="flex-1" aria-hidden />
@@ -182,13 +209,21 @@ export default function WordCard({
             className="btn btn-outline-danger"
           >
             Decline
+            {showShortcuts && <ShortcutPill keyLabel="D" />}
           </button>
           <button
             onClick={() => onVerify?.(word.id)}
             disabled={isLoading}
             className="btn btn-approve"
           >
-            {isLoading ? <span className="spinner" /> : "Approve"}
+            {isLoading ? (
+              <span className="spinner" />
+            ) : (
+              <>
+                Approve
+                {showShortcuts && <ShortcutPill keyLabel="A" />}
+              </>
+            )}
           </button>
         </div>
       )}
