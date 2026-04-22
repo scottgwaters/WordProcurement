@@ -165,7 +165,7 @@ export default function WordCard({
             disabled={isLoading}
             className="btn btn-outline-danger"
           >
-            Reject
+            Decline
           </button>
         </div>
       )}

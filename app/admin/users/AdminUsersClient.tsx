@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
 type User = {
   id: string;
@@ -12,6 +13,7 @@ type User = {
 type Invite = {
   id: string;
   email: string;
+  token: string;
   expiresAt: string;
   createdAt: string;
   createdBy?: { email: string };
@@ -20,6 +22,8 @@ type Invite = {
 type IssuedInvite = { email: string; link: string };
 
 export default function AdminUsersClient() {
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
   const [users, setUsers] = useState<User[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +95,23 @@ export default function AdminUsersClient() {
     } else {
       const data = await res.json().catch(() => ({}));
       alert(data.error ?? "Could not revoke invite");
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (
+      !confirm(
+        `Delete ${user.email}? This permanently removes their account. Users with existing review history cannot be deleted.`
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
+    if (res.ok) {
+      await refresh();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "Could not delete user");
     }
   };
 
@@ -170,26 +191,41 @@ export default function AdminUsersClient() {
           <div className="text-sm text-[var(--text-secondary)]">No pending invites.</div>
         ) : (
           <ul className="divide-y divide-[var(--border-light)]">
-            {invites.map((invite) => (
-              <li key={invite.id} className="flex items-center gap-3 py-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{invite.email}</div>
-                  <div className="text-xs text-[var(--text-secondary)]">
-                    Invited{" "}
-                    {new Date(invite.createdAt).toLocaleDateString()} · expires{" "}
-                    {new Date(invite.expiresAt).toLocaleDateString()}
-                    {invite.createdBy ? ` · by ${invite.createdBy.email}` : ""}
+            {invites.map((invite) => {
+              // Build the link client-side from origin + token so old
+              // invites stay copyable even if the deployment URL changes.
+              const link =
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/invite/${invite.token}`
+                  : `/invite/${invite.token}`;
+              return (
+                <li key={invite.id} className="flex items-center gap-3 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{invite.email}</div>
+                    <div className="text-xs text-[var(--text-secondary)]">
+                      Invited{" "}
+                      {new Date(invite.createdAt).toLocaleDateString()} · expires{" "}
+                      {new Date(invite.expiresAt).toLocaleDateString()}
+                      {invite.createdBy ? ` · by ${invite.createdBy.email}` : ""}
+                    </div>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRevoke(invite.id)}
-                  className="btn btn-secondary text-xs"
-                >
-                  Revoke
-                </button>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => copyLink(link)}
+                    className="btn btn-secondary text-xs"
+                  >
+                    {copiedLink === link ? "Copied!" : "Copy link"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRevoke(invite.id)}
+                    className="btn btn-secondary text-xs"
+                  >
+                    Revoke
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -203,19 +239,38 @@ export default function AdminUsersClient() {
           <div className="text-sm text-[var(--text-secondary)]">No users yet.</div>
         ) : (
           <ul className="divide-y divide-[var(--border-light)]">
-            {users.map((user) => (
-              <li key={user.id} className="flex items-center gap-3 py-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{user.email}</div>
-                  <div className="text-xs text-[var(--text-secondary)]">
-                    Joined {new Date(user.createdAt).toLocaleDateString()}
+            {users.map((user) => {
+              const isSelf = user.id === currentUserId;
+              return (
+                <li key={user.id} className="flex items-center gap-3 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {user.email}
+                      {isSelf && (
+                        <span className="ml-2 text-xs text-[var(--text-secondary)] font-normal">
+                          (you)
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-[var(--text-secondary)]">
+                      Joined {new Date(user.createdAt).toLocaleDateString()}
+                    </div>
                   </div>
-                </div>
-                {user.isAdmin && (
-                  <span className="badge badge-success">Admin</span>
-                )}
-              </li>
-            ))}
+                  {user.isAdmin && (
+                    <span className="badge badge-success">Admin</span>
+                  )}
+                  {!isSelf && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteUser(user)}
+                      className="btn btn-secondary text-xs"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

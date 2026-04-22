@@ -20,6 +20,9 @@ export async function GET() {
     },
   });
 
+  // Token is included so the admin can re-copy the invite link from the
+  // pending-invites list. Endpoint is already admin-gated; the token
+  // confers no extra access the admin doesn't already have.
   return NextResponse.json({ invites });
 }
 
