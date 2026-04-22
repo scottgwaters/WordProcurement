@@ -47,33 +47,8 @@
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-primary: #1A1D17;
-    --bg-secondary: #12140F;
-    --bg-tertiary: #22251F;
-    --bg-muted: #2B2F28;
-
-    --text-primary: #E8ECE5;
-    --text-secondary: #A8AEA1;
-    --text-tertiary: #6F7569;
-
-    --border: #3D4238;
-    --border-light: #2F332C;
-    --border-strong: #5B6354;
-
-    --accent: #A8BB9F;
-    --accent-hover: #B8C8AE;
-    --accent-active: #C3D1BA;
-    --accent-soft: #2E3A29;
-    --accent-softer: #232B1F;
-
-    --success: #7AA77A;  --success-bg: #1F2A1F;
-    --warning: #C9A35E;  --warning-bg: #2A2519;
-    --error:   #C57569;  --error-bg:   #2A1C1A;
-    --info:    #85A0B5;  --info-bg:    #1C232A;
-  }
-}
+/* Force light palette regardless of OS dark-mode preference — dark mode deferred until the full theme is tuned. */
+:root { color-scheme: light; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
