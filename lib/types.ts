@@ -67,19 +67,10 @@ export interface User {
   created_at: string;
 }
 
-// Stats for dashboard
-export interface DashboardStats {
-  totalWords: number;
-  verifiedWords: number;
-  unverifiedWords: number;
-  wordsByCategory: Record<string, number>;
-  wordsByAgeGroup: Record<AgeGroup, number>;
-  recentActivity: ActivityLog[];
-}
-
-// Filter options for word list
+// Filter options for word list. Worlds replaced the old fine-grained
+// category dimension; the `world` field is carried alongside this type
+// via intersection where needed (see /words, /review).
 export interface WordFilters {
-  category?: string;
   ageGroup?: AgeGroup;
   level?: Level;
   verified?: boolean;
@@ -100,43 +91,3 @@ export interface GeneratedHints {
   example_sentence: string;
   part_of_speech: string;
 }
-
-// Categories available in the word list
-export const CATEGORIES = [
-  "sight_words",
-  "heart_words",
-  "animals",
-  "food",
-  "nature",
-  "space",
-  "objects",
-  "magic",
-  "feelings",
-  "concepts",
-  "adventure",
-  "music_arts",
-  "people",
-  "science",
-  "body",
-  "clothing",
-  "colors",
-  "family",
-  "home",
-  "places",
-  "school",
-  "sports",
-  "time",
-  "transport",
-  "weather",
-  "action_verbs",
-  "descriptive_words",
-  "common_nouns",
-  "position_words",
-  "question_words",
-  "connecting_words",
-  "quantity_words",
-  "compound_words",
-  "contractions",
-] as const;
-
-export type Category = (typeof CATEGORIES)[number];

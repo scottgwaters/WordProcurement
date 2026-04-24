@@ -82,7 +82,9 @@ export const WORLDS: Record<WorldId, World> = {
   },
 };
 
-// Inverse of worldForCategory — used to group/filter categories by world.
+// Inverse of worldForCategory — the DB categories that map into each world.
+// After the 2026-04-23 taxonomy cleanup the mapping is 1:1 except for sight,
+// where heart_words is a second category that drives the isHeartWord flag.
 // Keep in sync with the switch statement below.
 export const CATEGORIES_BY_WORLD: Record<WorldId, string[]> = {
   sight:    ["sight_words", "heart_words"],
@@ -91,8 +93,8 @@ export const CATEGORIES_BY_WORLD: Record<WorldId, string[]> = {
   nature:   ["nature"],
   space:    ["space"],
   objects:  ["objects"],
-  magic:    ["magic", "adventure"],
-  feelings: ["feelings", "concepts"],
+  magic:    ["magic"],
+  feelings: ["feelings"],
 };
 
 export interface WorldAssignment {
@@ -119,10 +121,8 @@ export function worldForCategory(category: string): WorldAssignment {
     case "objects":
       return { world: WORLDS.objects, ambiguous: false };
     case "feelings":
-    case "concepts":
       return { world: WORLDS.feelings, ambiguous: false };
     case "magic":
-    case "adventure":
       return { world: WORLDS.magic, ambiguous: false };
     default:
       return {

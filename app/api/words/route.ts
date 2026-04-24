@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const category = searchParams.get("category");
   const world = searchParams.get("world");
   const ageGroup = searchParams.get("ageGroup");
   const level = searchParams.get("level");
@@ -53,8 +52,6 @@ export async function GET(request: NextRequest) {
 
   if (world && world in CATEGORIES_BY_WORLD) {
     where.category = { in: CATEGORIES_BY_WORLD[world as WorldId] };
-  } else if (category) {
-    where.category = category;
   }
   if (ageGroup) where.ageGroup = ageGroup;
   if (level) where.level = parseInt(level);

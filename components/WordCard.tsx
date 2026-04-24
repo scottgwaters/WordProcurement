@@ -2,6 +2,7 @@
 
 import type { Word } from "@/lib/types";
 import { worldForCategory } from "@/lib/worlds";
+import AgeBadge from "@/components/AgeBadge";
 import Link from "next/link";
 
 interface WordCardProps {
@@ -38,9 +39,9 @@ export default function WordCard({
             {word.word}
           </Link>
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            {/* Audience — cool tint */}
-            <span className="badge badge-meta-age">Ages {word.age_group}</span>
-            {/* Difficulty — warm tint */}
+            {/* Audience — distinct color per age bucket */}
+            <AgeBadge value={word.age_group} />
+            {/* Difficulty — neutral grey so age is the only ordinal using color */}
             <span className="badge badge-meta-level">Level {word.level}</span>
             {/* Destination — accent tint */}
             {assignment.world ? (

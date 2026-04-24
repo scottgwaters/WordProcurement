@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { Word, WordFilters } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import { worldForCategory } from "@/lib/worlds";
+import AgeBadge from "@/components/AgeBadge";
 
 // useSearchParams requires a Suspense boundary during prerender;
 // the outer default export provides one.
@@ -156,7 +157,7 @@ function WordsPageInner() {
                         )}
                       </td>
                       <td>
-                        <span className="badge badge-neutral">{word.age_group}</span>
+                        <AgeBadge value={word.age_group} />
                       </td>
                       <td>
                         <span className="text-sm">{word.level}</span>

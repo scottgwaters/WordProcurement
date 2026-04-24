@@ -270,31 +270,38 @@ textarea.input { height: auto; padding: 8px 12px; min-height: 80px; }
 
 /*
   Meta badges — subtly differentiate the *type* of information on a word card.
-  All low-saturation so the card stays calm; color only hints at the dimension
-  (classification vs. audience vs. difficulty vs. destination).
+  Age badges carry warm/distinct colors so reviewers can recognize the bucket
+  without reading the digits; level is pushed to neutral grey so the two
+  ordinal scales don't fight.
 */
-.badge-meta-category {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border-color: var(--border-light);
-}
-
-.badge-meta-age {
-  background: var(--info-bg);
-  color: var(--info);
-  border-color: color-mix(in srgb, var(--info) 20%, transparent);
-}
-
 .badge-meta-level {
-  background: var(--warning-bg);
-  color: var(--warning);
-  border-color: color-mix(in srgb, var(--warning) 20%, transparent);
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #e5e7eb;
 }
 
 .badge-meta-world {
   background: var(--accent-softer);
   color: var(--accent-active);
   border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.badge-age-46 {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.badge-age-79 {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.badge-age-1012 {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #a5b4fc;
 }
 
 /* ---------- Stat card ---------- */

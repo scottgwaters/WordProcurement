@@ -24,7 +24,6 @@ export default function FilterBar({
 }: FilterBarProps) {
   const hasAny =
     filters.search ||
-    filters.category ||
     filters.world ||
     filters.ageGroup ||
     filters.level ||
@@ -48,7 +47,7 @@ export default function FilterBar({
 
       <select
         value={filters.world || ""}
-        onChange={(e) => onChange({ ...filters, world: e.target.value || undefined, category: undefined })}
+        onChange={(e) => onChange({ ...filters, world: e.target.value || undefined })}
         className={selectCls}
         aria-label="Filter by world"
         title={
