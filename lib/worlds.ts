@@ -21,7 +21,7 @@ export const WORLDS: Record<WorldId, World> = {
     name: "Animal Kingdom",
     tagline: "Wild creatures, pets & bugs",
     description:
-      "Living creatures and the humans around them — pets, wild animals, insects, plus family and people words (mom, friend, baby). Anything that breathes.",
+      "Living creatures — mammals, birds, fish, reptiles, insects, their body coverings (shell, web), and collective terms (herd, swarm).",
     emoji: "🐾",
   },
   food: {
@@ -29,40 +29,40 @@ export const WORLDS: Record<WorldId, World> = {
     name: "Kitchen Quest",
     tagline: "Food, drinks & kitchen fun",
     description:
-      "Edible things, cooking, and the body — food, drinks, meals, kitchen items, and body parts like hand, foot, tooth.",
-    emoji: "🧁",
+      "Edibles and kitchen-world items — fruits, vegetables, meats, drinks, prepared dishes, cookware, and utensils (pot, pan, plate).",
+    emoji: "🍕",
   },
   nature: {
     id: "nature",
     name: "Nature Trail",
     tagline: "Outdoors, weather & earth",
     description:
-      "The outdoors — plants, trees, landscapes, weather, seasons, and outdoor sports or activities (hike, swim, camp).",
-    emoji: "🌳",
+      "The outdoors — landforms, weather, natural materials (wood, rock, glass), plants, seasons, and ecological processes.",
+    emoji: "🌿",
   },
   space: {
     id: "space",
     name: "Star Mission",
     tagline: "Planets, stars & rockets",
     description:
-      "Space and science — planets, stars, rockets, astronauts, plus broader science concepts (atom, magnet, gravity).",
+      "Astronomy and physical science — planets, stars, rockets, physics concepts (gravity, energy), and lab tools (telescope, beaker).",
     emoji: "🚀",
   },
   objects: {
     id: "objects",
-    name: "Treasure Hunt",
+    name: "Around the House",
     tagline: "Everyday things around you",
     description:
-      "Man-made objects — household items, furniture, clothing, vehicles, tools. Things kids touch and use every day.",
-    emoji: "🎁",
+      "Man-made household things — furniture, tools, school supplies, toys, clothes, containers, electronics, vehicles. Not kitchen-specific; not raw materials.",
+    emoji: "🏠",
   },
   magic: {
     id: "magic",
-    name: "Enchanted Words",
-    tagline: "Unicorns, wizards & fairy tales",
+    name: "Once Upon a Time",
+    tagline: "Knights, dragons & fairy tales",
     description:
-      "Imagination and creativity — magic, fairy tales, adventure, music and the arts, and abstract concepts (dream, idea, story).",
-    emoji: "✨",
+      "Fairy tales and adventures — magic creatures, wizards, fairy-tale figures (king, princess, knight), quests, pirates, and legendary items (wand, potion, treasure).",
+    emoji: "🏰",
   },
   sight: {
     id: "sight",
@@ -70,14 +70,14 @@ export const WORLDS: Record<WorldId, World> = {
     tagline: "Common words for faster reading",
     description:
       "High-frequency sight words and heart words — the building blocks of early reading (the, you, said, because). These don't fit a theme; they're taught for recognition.",
-    emoji: "📖",
+    emoji: "📚",
   },
   feelings: {
     id: "feelings",
     name: "Feelings Forest",
-    tagline: "Emotions & how we feel",
+    tagline: "Emotions, feelings & how we act",
     description:
-      "Emotions and emotional states — happy, scared, proud, lonely. Words that name what's going on inside.",
+      "Emotions, character traits, and virtues — happy, scared, kind, brave, proud, fair. Words that name what's going on inside or describe how someone acts.",
     emoji: "💗",
   },
 };
@@ -86,13 +86,13 @@ export const WORLDS: Record<WorldId, World> = {
 // Keep in sync with the switch statement below.
 export const CATEGORIES_BY_WORLD: Record<WorldId, string[]> = {
   sight:    ["sight_words", "heart_words"],
-  animals:  ["animals", "family", "people"],
-  food:     ["food", "body"],
-  nature:   ["nature", "weather", "sports"],
-  space:    ["space", "science"],
-  objects:  ["objects", "clothing", "transport", "home"],
-  magic:    ["concepts", "adventure", "music_arts", "magic"],
-  feelings: ["feelings"],
+  animals:  ["animals"],
+  food:     ["food"],
+  nature:   ["nature"],
+  space:    ["space"],
+  objects:  ["objects"],
+  magic:    ["magic", "adventure"],
+  feelings: ["feelings", "concepts"],
 };
 
 export interface WorldAssignment {
@@ -109,53 +109,21 @@ export function worldForCategory(category: string): WorldAssignment {
     case "heart_words":
       return { world: WORLDS.sight, ambiguous: false };
     case "animals":
-    case "family":
-    case "people":
       return { world: WORLDS.animals, ambiguous: false };
     case "food":
-    case "body":
       return { world: WORLDS.food, ambiguous: false };
     case "nature":
-    case "weather":
-    case "sports":
       return { world: WORLDS.nature, ambiguous: false };
     case "space":
-    case "science":
       return { world: WORLDS.space, ambiguous: false };
     case "objects":
-    case "clothing":
-    case "transport":
-    case "home":
       return { world: WORLDS.objects, ambiguous: false };
     case "feelings":
-      return { world: WORLDS.feelings, ambiguous: false };
     case "concepts":
-    case "adventure":
-    case "music_arts":
+      return { world: WORLDS.feelings, ambiguous: false };
     case "magic":
+    case "adventure":
       return { world: WORLDS.magic, ambiguous: false };
-    // Ambiguous: app picks one of several worlds at random/hash
-    case "actions":
-    case "action_verbs":
-    case "descriptive":
-    case "descriptive_words":
-    case "common":
-    case "common_nouns":
-    case "school":
-    case "colors":
-    case "places":
-    case "time":
-    case "position_words":
-    case "question_words":
-    case "connecting_words":
-    case "quantity_words":
-    case "compound_words":
-    case "contractions":
-      return {
-        world: null,
-        ambiguous: true,
-        note: "This category has no single world — the game picks one at random. Consider re-categorizing to a world-specific category.",
-      };
     default:
       return {
         world: null,
