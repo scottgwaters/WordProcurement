@@ -1,16 +1,33 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import FilterBar from "@/components/FilterBar";
 import Link from "next/link";
 import type { Word, WordFilters } from "@/lib/types";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { worldForCategory } from "@/lib/worlds";
 
+// useSearchParams requires a Suspense boundary during prerender;
+// the outer default export provides one.
 export default function WordsPage() {
+  return (
+    <Suspense fallback={null}>
+      <WordsPageInner />
+    </Suspense>
+  );
+}
+
+function WordsPageInner() {
+  const searchParams = useSearchParams();
   const [words, setWords] = useState<Word[]>([]);
-  const [filters, setFilters] = useState<WordFilters & { world?: string }>({});
+  // Seed from URL so dashboard deep-links (e.g. /words?world=feelings) land
+  // pre-filtered. Initial state reads the query string once; subsequent
+  // filter changes update local state but are not re-synced to the URL.
+  const [filters, setFilters] = useState<WordFilters & { world?: string }>(() => ({
+    world: searchParams.get("world") || undefined,
+  }));
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -28,7 +45,6 @@ export default function WordsPage() {
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
     if (filters.world) params.set("world", filters.world);
-    else if (filters.category) params.set("category", filters.category);
     if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
     if (filters.level) params.set("level", String(filters.level));
     if (filters.verified !== undefined) params.set("verified", String(filters.verified));
@@ -113,7 +129,7 @@ export default function WordsPage() {
                 <thead>
                   <tr>
                     <th>Word</th>
-                    <th>Category</th>
+                    <th>World</th>
                     <th>Age Group</th>
                     <th>Level</th>
                     <th>Status</th>
@@ -121,7 +137,9 @@ export default function WordsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {words.map((word) => (
+                  {words.map((word) => {
+                    const world = worldForCategory(word.category).world;
+                    return (
                     <tr key={word.id}>
                       <td>
                         <span className="font-semibold text-[var(--text-primary)] uppercase tracking-wide">
@@ -129,9 +147,13 @@ export default function WordsPage() {
                         </span>
                       </td>
                       <td>
-                        <span className="text-sm text-[var(--text-secondary)]">
-                          {word.category.replace(/_/g, " ")}
-                        </span>
+                        {world ? (
+                          <span className="text-sm text-[var(--text-secondary)]">
+                            {world.emoji} {world.name}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-[var(--warning)]">Unmapped</span>
+                        )}
                       </td>
                       <td>
                         <span className="badge badge-neutral">{word.age_group}</span>
@@ -172,7 +194,8 @@ export default function WordsPage() {
                         </Link>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

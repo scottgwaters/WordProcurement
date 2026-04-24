@@ -37,6 +37,10 @@ export default function AdminUsersClient() {
   // transactional email provider.
   const [issued, setIssued] = useState<IssuedInvite | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  // Per-user reset link, shown inline under the affected row so the admin
+  // can copy it without losing context on who it's for.
+  const [resetLinks, setResetLinks] = useState<Record<string, string>>({});
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -127,6 +131,40 @@ export default function AdminUsersClient() {
         message: data.error ?? "Please try again.",
         tone: "error",
       });
+    }
+  };
+
+  const handleSendResetLink = async (user: User) => {
+    const ok = await dlg.confirm({
+      title: `Send password reset link to ${user.email}?`,
+      message:
+        "This generates a single-use link valid for 7 days. Any pending invite or prior reset link for this email is invalidated.",
+      confirmLabel: "Generate reset link",
+    });
+    if (!ok) return;
+    setResettingUserId(user.id);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/reset-link`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        await dlg.alert({
+          title: "Couldn't create reset link",
+          message: data.error ?? "Please try again.",
+          tone: "error",
+        });
+        return;
+      }
+      setResetLinks((prev) => ({ ...prev, [user.id]: data.link }));
+    } catch {
+      await dlg.alert({
+        title: "Network error",
+        message: "Try again in a moment.",
+        tone: "error",
+      });
+    } finally {
+      setResettingUserId(null);
     }
   };
 
@@ -267,32 +305,70 @@ export default function AdminUsersClient() {
           <ul className="divide-y divide-[var(--border-light)]">
             {users.map((user) => {
               const isSelf = user.id === currentUserId;
+              const resetLink = resetLinks[user.id];
               return (
-                <li key={user.id} className="flex items-center gap-3 py-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">
-                      {user.email}
-                      {isSelf && (
-                        <span className="ml-2 text-xs text-[var(--text-secondary)] font-normal">
-                          (you)
-                        </span>
-                      )}
+                <li key={user.id} className="py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {user.email}
+                        {isSelf && (
+                          <span className="ml-2 text-xs text-[var(--text-secondary)] font-normal">
+                            (you)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-[var(--text-secondary)]">
+                        Joined {new Date(user.createdAt).toLocaleDateString()}
+                      </div>
                     </div>
-                    <div className="text-xs text-[var(--text-secondary)]">
-                      Joined {new Date(user.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                  {user.isAdmin && (
-                    <span className="badge badge-success">Admin</span>
-                  )}
-                  {!isSelf && (
+                    {user.isAdmin && (
+                      <span className="badge badge-success">Admin</span>
+                    )}
                     <button
                       type="button"
-                      onClick={() => handleDeleteUser(user)}
+                      onClick={() => handleSendResetLink(user)}
                       className="btn btn-secondary text-xs"
+                      disabled={resettingUserId === user.id}
                     >
-                      Delete
+                      {resettingUserId === user.id
+                        ? "Generating…"
+                        : resetLink
+                          ? "Regenerate reset link"
+                          : "Send reset link"}
                     </button>
+                    {!isSelf && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUser(user)}
+                        className="btn btn-secondary text-xs"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                  {resetLink && (
+                    <div className="mt-3 ml-0 rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3">
+                      <div className="text-xs text-[var(--text-secondary)] mb-2">
+                        Send this link to {user.email}. It expires in 7 days
+                        and lets them set a new password.
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          readOnly
+                          value={resetLink}
+                          className="input flex-1 font-mono text-xs"
+                          onFocus={(e) => e.currentTarget.select()}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => copyLink(resetLink)}
+                          className="btn btn-secondary text-xs"
+                        >
+                          {copiedLink === resetLink ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </li>
               );

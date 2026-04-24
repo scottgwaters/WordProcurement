@@ -36,17 +36,25 @@ export async function POST(
     );
   }
 
-  // Guard against a race where the email was claimed via a different
-  // invite (or setup) between issuing this one and redeeming it.
+  // If a user already exists for this email, treat the invite as a
+  // password reset (admin-issued via /api/admin/users/[id]/reset-link).
+  // Otherwise create a new non-admin user.
   const existing = await prisma.user.findUnique({ where: { email: invite.email } });
-  if (existing) {
-    return NextResponse.json(
-      { error: "A user with that email already exists. Try signing in." },
-      { status: 409 }
-    );
-  }
-
   const hashed = await bcrypt.hash(password, 12);
+
+  if (existing) {
+    await prisma.$transaction([
+      prisma.inviteToken.update({
+        where: { id: invite.id },
+        data: { usedAt: new Date() },
+      }),
+      prisma.user.update({
+        where: { id: existing.id },
+        data: { password: hashed },
+      }),
+    ]);
+    return NextResponse.json({ success: true, email: existing.email, reset: true });
+  }
 
   const [, user] = await prisma.$transaction([
     prisma.inviteToken.update({

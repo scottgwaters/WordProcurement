@@ -38,8 +38,6 @@ export default function WordCard({
             {word.word}
           </Link>
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            {/* Classification — neutral */}
-            <span className="badge badge-meta-category">{word.category.replace(/_/g, " ")}</span>
             {/* Audience — cool tint */}
             <span className="badge badge-meta-age">Ages {word.age_group}</span>
             {/* Difficulty — warm tint */}

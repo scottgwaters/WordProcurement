@@ -6,7 +6,6 @@ import Header from "@/components/Header";
 import type { Word, AgeGroup, Level, ActivityLogWithUser } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CATEGORIES } from "@/lib/types";
 import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 
 export default function WordDetailPage({
@@ -42,8 +41,6 @@ export default function WordDetailPage({
   // option in the World dropdown so the curator can see how full each
   // world is before (re)assigning.
   const [worldCounts, setWorldCounts] = useState<Record<WorldId, number> | null>(null);
-  // Controls the "Why this world?" popover next to the world badge.
-  const [showWhyWorld, setShowWhyWorld] = useState(false);
   // Soft-lock state: if someone else is already editing this word, we
   // show a read-only banner and disable the form rather than let two
   // reviewers stomp on each other.
@@ -353,75 +350,18 @@ export default function WordDetailPage({
               ) : (
                 <span className="badge badge-warning">Pending</span>
               )}
-              <span className="text-sm text-[var(--text-secondary)]">
-                {word.category.replace(/_/g, " ")}
-              </span>
               {(() => {
                 const a = worldForCategory(word.category);
-                const siblings = a.world
-                  ? CATEGORIES_BY_WORLD[a.world.id].filter((c) => c !== word.category)
-                  : [];
-                return (
-                  <span className="relative inline-flex items-center gap-1">
-                    {a.world ? (
-                      <span
-                        className="badge badge-neutral"
-                        title={`${a.world.tagline}\n\n${a.world.description}`}
-                      >
-                        {a.world.emoji} {a.world.name}
-                      </span>
-                    ) : (
-                      <span className="badge badge-warning" title={a.note}>
-                        ⚠ World: Mixed
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowWhyWorld((v) => !v)}
-                      className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-[var(--border)] text-[10px] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]"
-                      aria-label="Why this world?"
-                      aria-expanded={showWhyWorld}
-                    >
-                      ?
-                    </button>
-                    {showWhyWorld && (
-                      <div
-                        role="tooltip"
-                        className="absolute left-0 top-full mt-1 z-10 w-72 p-3 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] shadow-lg text-xs leading-relaxed text-[var(--text-primary)]"
-                      >
-                        <div className="mb-2">
-                          <span className="font-medium">Category</span>{" "}
-                          <code className="px-1 py-0.5 rounded bg-[var(--bg-secondary)]">
-                            {word.category}
-                          </code>{" "}
-                          →{" "}
-                          {a.world ? (
-                            <>
-                              <span>
-                                {a.world.emoji} {a.world.name}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-[var(--warning)]">ambiguous</span>
-                          )}
-                        </div>
-                        {a.world && (
-                          <div className="mb-2 text-[var(--text-secondary)]">
-                            {a.world.description}
-                          </div>
-                        )}
-                        {siblings.length > 0 && (
-                          <div className="text-[var(--text-secondary)]">
-                            Other categories mapped to{" "}
-                            <span className="font-medium">{a.world?.name}</span>:{" "}
-                            {siblings.map((c) => c.replace(/_/g, " ")).join(", ")}
-                          </div>
-                        )}
-                        {a.note && !a.world && (
-                          <div className="text-[var(--warning)]">{a.note}</div>
-                        )}
-                      </div>
-                    )}
+                return a.world ? (
+                  <span
+                    className="badge badge-neutral"
+                    title={`${a.world.tagline}\n\n${a.world.description}`}
+                  >
+                    {a.world.emoji} {a.world.name}
+                  </span>
+                ) : (
+                  <span className="badge badge-warning" title={a.note}>
+                    ⚠ World: Mixed
                   </span>
                 );
               })()}
@@ -443,25 +383,28 @@ export default function WordDetailPage({
               </Link>
             </div>
             <ul className="space-y-1 text-[var(--text-primary)]">
-              {duplicates.map((d) => (
-                <li key={d.id} className="flex items-center gap-2">
-                  <Link
-                    href={`/words/${d.id}?from=${from ?? "words"}`}
-                    className="underline hover:no-underline"
-                  >
-                    {d.word}
-                  </Link>
-                  <span className="text-[var(--text-secondary)]">
-                    · ages {d.ageGroup} · level {d.level} ·{" "}
-                    {d.category.replace(/_/g, " ")}
-                  </span>
-                  {d.verified ? (
-                    <span className="badge badge-success">Verified</span>
-                  ) : (
-                    <span className="badge badge-warning">Pending</span>
-                  )}
-                </li>
-              ))}
+              {duplicates.map((d) => {
+                const dWorld = worldForCategory(d.category).world;
+                return (
+                  <li key={d.id} className="flex items-center gap-2">
+                    <Link
+                      href={`/words/${d.id}?from=${from ?? "words"}`}
+                      className="underline hover:no-underline"
+                    >
+                      {d.word}
+                    </Link>
+                    <span className="text-[var(--text-secondary)]">
+                      · ages {d.ageGroup} · level {d.level}
+                      {dWorld ? ` · ${dWorld.emoji} ${dWorld.name}` : ""}
+                    </span>
+                    {d.verified ? (
+                      <span className="badge badge-success">Verified</span>
+                    ) : (
+                      <span className="badge badge-warning">Pending</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
             <p className="mt-2 text-xs text-[var(--text-secondary)]">
               Use <span className="font-medium">Edit all variants together</span> to keep shared fields (definition, pronunciation, etc.) in sync across age groups.
@@ -567,10 +510,14 @@ export default function WordDetailPage({
                     value={worldForCategory(formData.category).world?.id ?? ""}
                     onChange={(e) => {
                       const newWorldId = e.target.value as WorldId;
-                      const defaultCategory = CATEGORIES_BY_WORLD[newWorldId]?.[0];
-                      if (defaultCategory) {
-                        setFormData({ ...formData, category: defaultCategory });
-                      }
+                      // For sight, preserve heart_words if it was already set;
+                      // otherwise default to the first category for that world.
+                      const currentIsHeart = formData.category === "heart_words";
+                      const nextCategory =
+                        newWorldId === "sight" && currentIsHeart
+                          ? "heart_words"
+                          : (CATEGORIES_BY_WORLD[newWorldId]?.[0] ?? formData.category);
+                      setFormData({ ...formData, category: nextCategory });
                     }}
                     className="input"
                   >
@@ -593,9 +540,6 @@ export default function WordDetailPage({
                     })}
                   </select>
                   {(() => {
-                    // Show the full description of the currently-selected world
-                    // so the reviewer has concrete examples of what belongs
-                    // there without having to hover a tooltip.
                     const selected = worldForCategory(formData.category).world;
                     return selected ? (
                       <p className="text-xs mt-1 text-[var(--text-secondary)] leading-relaxed">
@@ -606,40 +550,21 @@ export default function WordDetailPage({
                       </p>
                     ) : null;
                   })()}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                    Category <span className="text-[var(--text-tertiary)] font-normal">(fine-grained)</span>
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="input"
-                  >
-                    {Object.values(WORLDS).map((w) => (
-                      <optgroup key={w.id} label={`${w.emoji} ${w.name}`}>
-                        {CATEGORIES_BY_WORLD[w.id]
-                          .filter((c) => (CATEGORIES as readonly string[]).includes(c))
-                          .map((cat) => (
-                            <option key={cat} value={cat}>
-                              {cat.replace(/_/g, " ")}
-                            </option>
-                          ))}
-                      </optgroup>
-                    ))}
-                    {/* Any categories not yet mapped to a world */}
-                    <optgroup label="⚠ Unmapped">
-                      {CATEGORIES.filter(
-                        (c) => !Object.values(CATEGORIES_BY_WORLD).flat().includes(c)
-                      ).map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat.replace(/_/g, " ")}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
+                  {worldForCategory(formData.category).world?.id === "sight" && (
+                    <label className="mt-2 inline-flex items-center gap-2 text-sm text-[var(--text-primary)] cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.category === "heart_words"}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            category: e.target.checked ? "heart_words" : "sight_words",
+                          })
+                        }
+                      />
+                      Heart word <span className="text-[var(--text-secondary)] font-normal">(irregular spelling kids memorize)</span>
+                    </label>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">

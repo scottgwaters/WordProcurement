@@ -53,7 +53,6 @@ export default function ReviewPage() {
       // land on the same pending word.
       params.set("excludeLeased", "1");
       if (filters.world) params.set("world", filters.world);
-      else if (filters.category) params.set("category", filters.category);
       if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
       if (filters.level) params.set("level", String(filters.level));
       if (filters.flagged) params.set("flagged", "true");

@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-// Category groups by world — mirrors lib/worlds.ts. When the caller filters
-// by `world`, translate to the set of categories that route to that world.
-const CATEGORIES_BY_WORLD: Record<string, string[]> = {
-  sight:    ["sight_words", "heart_words"],
-  animals:  ["animals", "family", "people"],
-  food:     ["food", "body"],
-  nature:   ["nature", "weather", "sports"],
-  space:    ["space", "science"],
-  objects:  ["objects", "clothing", "transport", "home"],
-  magic:    ["concepts", "adventure", "music_arts", "magic"],
-  feelings: ["feelings"],
-};
+import { CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 
 // GET /api/words - List words with optional filters
 export async function GET(request: NextRequest) {
@@ -63,8 +51,8 @@ export async function GET(request: NextRequest) {
     id?: { in?: string[]; notIn?: string[] };
   } = {};
 
-  if (world && CATEGORIES_BY_WORLD[world]) {
-    where.category = { in: CATEGORIES_BY_WORLD[world] };
+  if (world && world in CATEGORIES_BY_WORLD) {
+    where.category = { in: CATEGORIES_BY_WORLD[world as WorldId] };
   } else if (category) {
     where.category = category;
   }

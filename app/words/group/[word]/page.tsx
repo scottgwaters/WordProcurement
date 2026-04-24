@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import type { AgeGroup, Level } from "@/lib/types";
-import { CATEGORIES } from "@/lib/types";
 import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 
 type Variant = {
@@ -347,10 +346,12 @@ export default function GroupedWordPage({
                 value={currentWorld?.id ?? ""}
                 onChange={(e) => {
                   const newWorldId = e.target.value as WorldId;
-                  const defaultCategory = CATEGORIES_BY_WORLD[newWorldId]?.[0];
-                  if (defaultCategory) {
-                    setShared({ ...shared, category: defaultCategory });
-                  }
+                  const currentIsHeart = shared.category === "heart_words";
+                  const nextCategory =
+                    newWorldId === "sight" && currentIsHeart
+                      ? "heart_words"
+                      : (CATEGORIES_BY_WORLD[newWorldId]?.[0] ?? shared.category);
+                  setShared({ ...shared, category: nextCategory });
                 }}
                 className="input"
               >
@@ -373,30 +374,21 @@ export default function GroupedWordPage({
                   {currentWorld.description}
                 </p>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                Category{" "}
-                <span className="text-[var(--text-tertiary)] font-normal">(fine-grained)</span>
-              </label>
-              <select
-                value={shared.category}
-                onChange={(e) => setShared({ ...shared, category: e.target.value })}
-                className="input"
-              >
-                {Object.values(WORLDS).map((w) => (
-                  <optgroup key={w.id} label={`${w.emoji} ${w.name}`}>
-                    {CATEGORIES_BY_WORLD[w.id]
-                      .filter((c) => (CATEGORIES as readonly string[]).includes(c))
-                      .map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat.replace(/_/g, " ")}
-                        </option>
-                      ))}
-                  </optgroup>
-                ))}
-              </select>
+              {currentWorld?.id === "sight" && (
+                <label className="mt-2 inline-flex items-center gap-2 text-sm text-[var(--text-primary)] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={shared.category === "heart_words"}
+                    onChange={(e) =>
+                      setShared({
+                        ...shared,
+                        category: e.target.checked ? "heart_words" : "sight_words",
+                      })
+                    }
+                  />
+                  Heart word <span className="text-[var(--text-secondary)] font-normal">(irregular spelling kids memorize)</span>
+                </label>
+              )}
             </div>
 
             <div>

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import Header from "@/components/Header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 
 export default async function Dashboard() {
   const session = await auth();
@@ -33,10 +34,21 @@ export default async function Dashboard() {
     }),
   ]);
 
-  // Calculate category counts
+  // Roll up category counts into world counts using the same mapping the
+  // app uses — keeps the dashboard honest if the category list drifts.
   const categoryCounts: Record<string, number> = {};
   categoryStats.forEach((stat) => {
     categoryCounts[stat.category] = stat._count.category;
+  });
+  const worldCounts: Record<WorldId, number> = {
+    animals: 0, food: 0, nature: 0, space: 0,
+    objects: 0, magic: 0, sight: 0, feelings: 0,
+  };
+  (Object.keys(CATEGORIES_BY_WORLD) as WorldId[]).forEach((worldId) => {
+    worldCounts[worldId] = CATEGORIES_BY_WORLD[worldId].reduce(
+      (sum, cat) => sum + (categoryCounts[cat] || 0),
+      0,
+    );
   });
 
   const unverifiedWords = totalWords - verifiedWords;
@@ -96,25 +108,30 @@ export default async function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Categories breakdown */}
+          {/* Words by world — each row deep-links to /words pre-filtered. */}
           <div className="card p-6">
-            <h2 className="text-lg font-semibold mb-4">Words by Category</h2>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {Object.entries(categoryCounts)
-                .sort((a, b) => b[1] - a[1])
-                .map(([category, count]) => (
-                  <div
-                    key={category}
-                    className="flex items-center justify-between py-2 border-b border-[var(--border-light)] last:border-0"
-                  >
-                    <span className="text-sm text-[var(--text-primary)]">
-                      {category.replace(/_/g, " ")}
-                    </span>
-                    <span className="text-sm font-medium text-[var(--text-secondary)]">
-                      {count}
-                    </span>
-                  </div>
-                ))}
+            <h2 className="text-lg font-semibold mb-4">Words by World</h2>
+            <div className="space-y-1">
+              {(Object.keys(worldCounts) as WorldId[])
+                .sort((a, b) => worldCounts[b] - worldCounts[a])
+                .map((worldId) => {
+                  const world = WORLDS[worldId];
+                  return (
+                    <Link
+                      key={worldId}
+                      href={`/words?world=${worldId}`}
+                      className="flex items-center justify-between py-2 px-2 -mx-2 rounded border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-normal"
+                    >
+                      <span className="text-sm text-[var(--text-primary)] flex items-center gap-2">
+                        <span>{world.emoji}</span>
+                        <span>{world.name}</span>
+                      </span>
+                      <span className="text-sm font-medium text-[var(--text-secondary)]">
+                        {worldCounts[worldId]}
+                      </span>
+                    </Link>
+                  );
+                })}
             </div>
           </div>
 
