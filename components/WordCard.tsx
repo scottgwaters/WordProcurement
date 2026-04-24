@@ -29,12 +29,12 @@ export default function WordCard({
   const assignment = worldForCategory(word.category);
   return (
     <div className="card p-6 transition-normal">
-      {/* Word header */}
-      <div className="flex items-start justify-between mb-4">
+      {/* Header: word + chips + status — visually sealed with a bottom divider */}
+      <div className="review-card-header">
         <div>
           <Link
             href={`/words/${word.id}`}
-            className="word-display hover:text-[var(--accent)] transition-fast"
+            className="word-display word-display--xl hover:text-[var(--accent)] transition-fast"
           >
             {word.word}
           </Link>
@@ -82,42 +82,45 @@ export default function WordCard({
         </div>
       </div>
 
-      {/* Hints */}
-      {word.hints && (
-        <div className="space-y-2 mb-4">
-          <div className="text-sm">
-            <span className="font-medium text-[var(--text-secondary)]">Easy: </span>
-            <span className="text-[var(--text-primary)]">{word.hints.easy}</span>
-          </div>
-          <div className="text-sm">
-            <span className="font-medium text-[var(--text-secondary)]">Medium: </span>
-            <span className="text-[var(--text-primary)]">{word.hints.medium}</span>
-          </div>
-          <div className="text-sm">
-            <span className="font-medium text-[var(--text-secondary)]">Hard: </span>
-            <span className="text-[var(--text-primary)]">{word.hints.hard}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Educational metadata */}
+      {/* 1. Definition — the anchor / source of truth */}
       {(word.definition || word.example_sentence) && (
-        <div className="border-t border-[var(--border-light)] pt-6 mt-8 space-y-3">
+        <section className="review-def">
+          <div className="review-section-label">Definition</div>
           {word.definition && (
-            <div className="text-sm">
-              <span className="font-medium text-[var(--text-secondary)]">Definition: </span>
-              <span className="text-[var(--text-primary)]">{word.definition}</span>
-            </div>
+            <div className="review-def__body">{word.definition}</div>
           )}
           {word.example_sentence && (
-            <div className="text-sm">
-              <span className="font-medium text-[var(--text-secondary)]">Example: </span>
-              <span className="text-[var(--text-primary)] italic">
-                &ldquo;{word.example_sentence}&rdquo;
-              </span>
+            <div className="review-def__example">
+              &ldquo;{word.example_sentence}&rdquo;
             </div>
           )}
-        </div>
+        </section>
+      )}
+
+      {/* 2. Hints — bounded module with title bar and ordered rows */}
+      {word.hints && (
+        <section className="review-hints">
+          <header className="review-hints__titlebar">
+            <span className="review-hints__title">Hints</span>
+          </header>
+          <ol className="review-hints__list">
+            <li className="review-hints__row" data-tier="easy">
+              <span className="review-hints__num">1</span>
+              <span className="review-hints__pill">Easy</span>
+              <span className="review-hints__text">{word.hints.easy}</span>
+            </li>
+            <li className="review-hints__row" data-tier="medium">
+              <span className="review-hints__num">2</span>
+              <span className="review-hints__pill">Medium</span>
+              <span className="review-hints__text">{word.hints.medium}</span>
+            </li>
+            <li className="review-hints__row" data-tier="hard">
+              <span className="review-hints__num">3</span>
+              <span className="review-hints__pill">Hard</span>
+              <span className="review-hints__text">{word.hints.hard}</span>
+            </li>
+          </ol>
+        </section>
       )}
 
       {/* Actions — progressive commitment: low-weight left, irreversible right */}

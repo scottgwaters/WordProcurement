@@ -389,3 +389,166 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
 /* ---------- Transitions ---------- */
 .transition-fast { transition: background-color 120ms var(--ease), color 120ms var(--ease), border-color 120ms var(--ease); }
 .transition-normal { transition: background-color 200ms var(--ease), color 200ms var(--ease), border-color 200ms var(--ease); }
+
+/* ===== Review card — hierarchy staircase: WORD > DEFINITION > HINTS ===== */
+
+/* 1. Word (card title) */
+.word-display--xl {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  color: #0b1220;
+  display: inline-block;
+  padding-bottom: 4px;
+  text-transform: none;
+}
+
+/* Header row with soft underline separating title from content zones */
+.review-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eef0f3;
+  margin-bottom: 18px;
+}
+
+/* Shared small-caps section label */
+.review-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin: 4px 0 10px 2px;
+}
+
+/* 2. Definition anchor block — warm neutral, NOT saturated blue */
+.review-def {
+  margin-bottom: 20px;
+}
+.review-def__body {
+  background: #f7f5f0;
+  border: 1px solid #e8e2d4;
+  border-left: 4px solid #8a7a5a;
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #0f172a;
+}
+.review-def__example {
+  margin: 10px 2px 0;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+/* 3. Hints — bounded module */
+.review-hints {
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  background: transparent;        /* let row tints run edge-to-edge */
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
+}
+
+.review-hints__titlebar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #f4f5f2;
+  border-bottom: 1px solid #e6e8ee;
+}
+.review-hints__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+/* Ordered list, no default styling */
+.review-hints__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Each row: flush stack, tier-colored left border, tinted background */
+.review-hints__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  line-height: 1.55;
+  font-size: 14.5px;
+  border-left: 3px solid transparent;
+}
+.review-hints__row + .review-hints__row {
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+/* Calmer tonal palette — sage / taupe / mauve (NOT green/amber/red) */
+.review-hints__row[data-tier="easy"] {
+  background: #f6f9f8;
+  border-left-color: #6b9b98;
+}
+.review-hints__row[data-tier="medium"] {
+  background: #faf7f1;
+  border-left-color: #b59b6e;
+}
+.review-hints__row[data-tier="hard"] {
+  background: #faf3f4;
+  border-left-color: #a66b7a;
+}
+
+/* Numeric step indicator (1/2/3) */
+.review-hints__num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: #ffffff;
+  border: 1px solid #e2e6ee;
+  margin-top: 1px;
+}
+.review-hints__row[data-tier="easy"]   .review-hints__num { color: #2f5d5a; border-color: #cfdcdb; }
+.review-hints__row[data-tier="medium"] .review-hints__num { color: #6b5a3e; border-color: #dccfb8; }
+.review-hints__row[data-tier="hard"]   .review-hints__num { color: #7a3b4b; border-color: #dcc1c6; }
+
+/* Tier pill — FIXED WIDTH so hint text aligns across rows */
+.review-hints__pill {
+  display: inline-block;
+  min-width: 72px;
+  text-align: center;
+  box-sizing: border-box;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-right: 12px;
+  vertical-align: 2px;
+  color: #475569;
+  background: #eef1f5;
+}
+.review-hints__row[data-tier="easy"]   .review-hints__pill { background: #e4ecec; color: #2f5d5a; }
+.review-hints__row[data-tier="medium"] .review-hints__pill { background: #ece6dd; color: #6b5a3e; }
+.review-hints__row[data-tier="hard"]   .review-hints__pill { background: #ecdde1; color: #7a3b4b; }
+
+.review-hints__text {
+  color: #0f172a;
+  flex: 1 1 auto;
+}
