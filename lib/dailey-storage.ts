@@ -23,6 +23,14 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 const PRESIGN_TTL_SECONDS = 3600;     // signed URLs valid 1h
 const CACHE_TTL_MS = 50 * 60 * 1000;  // refresh before the URL actually expires
 
+// Dailey stores each project's objects under a `<project-id>/` prefix inside
+// the shared `dailey-os` bucket. The docs imply the injected S3 credentials
+// translate user-supplied keys into the prefixed physical path transparently
+// — but in practice the SDK hits `dailey-os/<key>` without the prefix and
+// gets 404. So we prepend it ourselves. Same project ID used by the `dailey`
+// CLI when uploading via presign.
+const PROJECT_PREFIX = "fd5c82d9-1fd1-4f27-b10e-dd6ce36f1859";
+
 type CachedPresign = { url: string; expiresAt: number };
 const cache = new Map<string, CachedPresign>();
 
@@ -61,15 +69,16 @@ export async function presignDownload(key: string): Promise<string> {
     if (cached && cached.expiresAt > now) return cached.url;
 
     const bucket = getBucket();
+    const physicalKey = `${PROJECT_PREFIX}/${key}`;
     const url = await getSignedUrl(
         getClient(),
-        new GetObjectCommand({ Bucket: bucket, Key: key }),
+        new GetObjectCommand({ Bucket: bucket, Key: physicalKey }),
         { expiresIn: PRESIGN_TTL_SECONDS },
     );
     // One-line trace per cache-miss so we can see whether S3_* env vars are
     // wired correctly and what R2 path we're actually hitting. Strip once
     // images are confirmed rendering.
-    console.log(`[s3] bucket=${bucket} key=${key} endpoint=${process.env.S3_ENDPOINT || "MISSING"} signed=${url.split("?")[0]}`);
+    console.log(`[s3] bucket=${bucket} key=${physicalKey} signed=${url.split("?")[0]}`);
 
     cache.set(key, { url, expiresAt: now + CACHE_TTL_MS });
     return url;
