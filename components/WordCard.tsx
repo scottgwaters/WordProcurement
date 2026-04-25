@@ -38,7 +38,7 @@ export default function WordCard({
       <div className="review-card-header">
         {!imageFailed && (
           <img
-            src={`/api/words/${word.id}/image`}
+            src={`https://scottgwaters.com/wordnauts/${word.id}.png`}
             alt={`Illustration for ${word.word}`}
             className="review-card-image"
             loading="lazy"
