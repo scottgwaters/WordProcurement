@@ -48,6 +48,12 @@ function getClient(): S3Client {
             "to trigger auto-provisioning.",
         );
     }
+    console.log(
+        `[s3-init] endpoint=${endpoint} region=${process.env.S3_REGION || "auto"} ` +
+        `bucket=${process.env.S3_BUCKET_NAME || "?"} keyIdLen=${accessKeyId.length} ` +
+        `secretLen=${secretAccessKey.length} keyIdHead=${accessKeyId.slice(0, 8)} ` +
+        `secretHead=${secretAccessKey.slice(0, 4)}`,
+    );
     s3Client = new S3Client({
         region: process.env.S3_REGION || "auto",
         endpoint,
