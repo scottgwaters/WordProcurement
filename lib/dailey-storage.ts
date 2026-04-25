@@ -25,8 +25,21 @@ const cache = new Map<string, CachedPresign>();
 // the resulting JWT in-memory, and refresh before it expires. Bug filed
 // with Dailey — see dailey-env-truncation-bug.md in the Wordnauts repo.
 let cachedToken: { value: string; expiresAt: number } | null = null;
+// Circuit breaker: if a login attempt fails with a lockout or bad-creds
+// response, remember the failure so every incoming image request doesn't
+// re-hammer /customers/login. Without this, a wrong password floods Dailey's
+// auth endpoint, trips their 423 lockout, and every subsequent request
+// extends the lockout window.
+let loginFailedUntil = 0;
+let lastLoginError = "";
 
 async function refreshToken(): Promise<string> {
+    const now = Date.now();
+    if (now < loginFailedUntil) {
+        throw new Error(
+            `Dailey login circuit-broken until ${new Date(loginFailedUntil).toISOString()} — last error: ${lastLoginError}`,
+        );
+    }
     const email = process.env.DAILEY_EMAIL?.trim();
     const password = process.env.DAILEY_PASSWORD;
     if (!email || !password) {
@@ -45,12 +58,26 @@ async function refreshToken(): Promise<string> {
     });
     if (!res.ok) {
         const body = await res.text().catch(() => "");
-        throw new Error(`Dailey login failed: ${res.status} ${body.slice(0, 200)}`);
+        lastLoginError = `${res.status} ${body.slice(0, 200)}`;
+        // 423 is "locked out, try again in N minutes" — honor the hint if
+        // Dailey provides one, otherwise back off for 15 min.
+        if (res.status === 423) {
+            const minMatch = body.match(/(\d+)\s*minute/);
+            const mins = minMatch ? parseInt(minMatch[1], 10) : 15;
+            loginFailedUntil = now + (mins + 1) * 60 * 1000;
+        } else if (res.status === 401 || res.status === 403) {
+            // Bad creds (probably). Pause 2 min so we don't burn through to 423.
+            loginFailedUntil = now + 2 * 60 * 1000;
+        } else {
+            loginFailedUntil = now + 30 * 1000;
+        }
+        console.error(`[dailey-login] ${lastLoginError} (circuit-break until ${new Date(loginFailedUntil).toISOString()})`);
+        throw new Error(`Dailey login failed: ${lastLoginError}`);
     }
     const data = (await res.json()) as { access_token?: string; token?: string };
     const tok = data.access_token || data.token;
     if (!tok) throw new Error("Dailey login returned no access token");
-    cachedToken = { value: tok, expiresAt: Date.now() + TOKEN_REFRESH_TTL_MS };
+    cachedToken = { value: tok, expiresAt: now + TOKEN_REFRESH_TTL_MS };
     return tok;
 }
 
@@ -68,29 +95,28 @@ export async function presignDownload(key: string): Promise<string> {
     const now = Date.now();
     if (cached && cached.expiresAt > now) return cached.url;
 
-    let token = await getToken();
-    const doFetch = (t: string) => fetch(
+    const token = await getToken();
+    const res = await fetch(
         `${DAILEY_API_BASE}/projects/${PROJECT_ID}/storage/presign-download`,
         {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "X-Dailey-Source": "word-procurement",
-                Authorization: `Bearer ${t}`,
+                Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ key, expires_in_seconds: PRESIGN_TTL_SECONDS }),
         },
     );
-
-    let res = await doFetch(token);
-    // If Dailey rotated our cached token behind our back, fetch a fresh one
-    // once and retry before giving up.
-    if (res.status === 401) {
-        cachedToken = null;
-        token = await refreshToken();
-        res = await doFetch(token);
-    }
+    // No auto-retry on 401 here. If the token is bad, the circuit breaker in
+    // refreshToken() handles backoff. Retrying mid-request turned into a
+    // login-flood loop and tripped Dailey's rate limiter.
     if (!res.ok) {
+        // On a 401 from the presign endpoint, drop the cached token so the
+        // next request gets a fresh one via refreshToken() (subject to the
+        // circuit breaker). Don't retry inline.
+        if (res.status === 401) cachedToken = null;
+
         const body = await res.text().catch(() => "");
         // Don't cache failures — a transient 500 shouldn't blackhole the key
         // for the next 50 minutes.
