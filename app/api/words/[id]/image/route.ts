@@ -15,21 +15,25 @@ export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
+    const { id } = await params;
     const session = await auth();
     if (!session?.user?.id) {
+        console.log(`[img] ${id} unauthorized (no session)`);
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await params;
     const word = await prisma.word.findUnique({
         where: { id },
         select: { id: true, category: true },
     });
     if (!word) {
+        console.log(`[img] ${id} word not found in DB`);
         return NextResponse.json({ error: "Word not found" }, { status: 404 });
     }
 
     const key = imageKeyForWord(word);
+    console.log(`[img] ${id} word=${word.category} key=${key}`);
+
     try {
         const url = await presignDownload(key);
         // 302 so the browser refetches against R2 directly. The presigned URL
@@ -37,6 +41,7 @@ export async function GET(
         return NextResponse.redirect(url, 302);
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        console.error(`[img] ${id} presign error: ${message}`);
         return NextResponse.json(
             { error: "Failed to presign image URL", detail: message },
             { status: 500 },
