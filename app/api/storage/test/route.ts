@@ -40,6 +40,13 @@ export async function GET(request: NextRequest) {
         keyIdLen: process.env.S3_ACCESS_KEY_ID?.length ?? 0,
         secretLen: process.env.S3_SECRET_ACCESS_KEY?.length ?? 0,
         keyIdHead: process.env.S3_ACCESS_KEY_ID?.slice(0, 8),
+        // After Dailey's backend update we want to know what platform-injected
+        // env vars now exist. Print every key matching the relevant prefixes
+        // (lengths only, never values) so we can find the new presign path.
+        allDaileyVars: Object.keys(process.env)
+            .filter((k) => /^(DAILEY|STORAGE|S3_|R2_|BUCKET|CDN|PRESIGN)/i.test(k))
+            .sort()
+            .map((k) => `${k}=${process.env[k]?.length ?? 0}`),
     };
 
     if (!env.S3_ENDPOINT || !process.env.S3_ACCESS_KEY_ID || !process.env.S3_SECRET_ACCESS_KEY) {
