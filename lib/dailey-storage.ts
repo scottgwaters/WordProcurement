@@ -52,6 +52,8 @@ export async function presignDownload(key: string): Promise<string> {
     );
     if (!res.ok) {
         const body = await res.text().catch(() => "");
+        const tokLen = process.env.DAILEY_API_TOKEN?.trim().length ?? 0;
+        console.error(`[presign] ${res.status} key=${key} tokLen=${tokLen} body=${body.slice(0, 200)}`);
         // Don't cache failures — a transient 500 shouldn't blackhole the key
         // for the next 50 minutes.
         throw new Error(`Dailey presign failed: ${res.status} ${body.slice(0, 200)}`);
