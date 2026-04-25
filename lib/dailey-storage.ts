@@ -22,15 +22,62 @@ const CACHE_TTL_MS = 50 * 60 * 1000;  // refresh before R2's URL expires
 type CachedPresign = { url: string; expiresAt: number };
 const cache = new Map<string, CachedPresign>();
 
-function getToken(): string {
-    const tok = process.env.DAILEY_API_TOKEN?.trim();
-    if (!tok) {
+// Runtime token refresh. DAILEY_API_TOKEN gets truncated to 24 chars by
+// Dailey's env-injection on new pod starts (the original 1327-char JWT
+// arrives mangled), so we can't use the env-baked token directly. Use the
+// short, intact DAILEY_EMAIL + DAILEY_PASSWORD to login at runtime and
+// hold the resulting JWT in memory.
+let cachedToken: { value: string; expiresAt: number } | null = null;
+let loginFailedUntil = 0;
+let lastLoginError = "";
+const TOKEN_REFRESH_TTL_MS = 50 * 60 * 1000;
+
+async function refreshToken(): Promise<string> {
+    const now = Date.now();
+    if (now < loginFailedUntil) {
         throw new Error(
-            "DAILEY_API_TOKEN missing. The pod needs a Dailey access token " +
-            "to mint presigned download URLs. Set it via the Dailey dashboard.",
+            `Dailey login circuit-broken until ${new Date(loginFailedUntil).toISOString()}: ${lastLoginError}`,
         );
     }
+    const email = process.env.DAILEY_EMAIL?.trim();
+    const password = process.env.DAILEY_PASSWORD;
+    if (!email || !password) {
+        throw new Error("Dailey credentials missing — need DAILEY_EMAIL and DAILEY_PASSWORD");
+    }
+    const res = await fetch(`${DAILEY_API_BASE}/customers/login`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Dailey-Source": "word-procurement",
+        },
+        body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        lastLoginError = `${res.status} ${body.slice(0, 200)}`;
+        // Circuit-break on 423 (lockout) honoring server's wait-N-minutes hint.
+        if (res.status === 423) {
+            const m = body.match(/(\d+)\s*minute/);
+            const mins = m ? parseInt(m[1], 10) : 15;
+            loginFailedUntil = now + (mins + 1) * 60 * 1000;
+        } else if (res.status === 401 || res.status === 403) {
+            loginFailedUntil = now + 2 * 60 * 1000;
+        } else {
+            loginFailedUntil = now + 30 * 1000;
+        }
+        console.error(`[dailey-login] ${lastLoginError} (circuit-break ${(loginFailedUntil - now) / 1000}s)`);
+        throw new Error(`Dailey login failed: ${lastLoginError}`);
+    }
+    const data = (await res.json()) as { access_token?: string; token?: string };
+    const tok = data.access_token || data.token;
+    if (!tok) throw new Error("Dailey login returned no token");
+    cachedToken = { value: tok, expiresAt: now + TOKEN_REFRESH_TTL_MS };
     return tok;
+}
+
+async function getToken(): Promise<string> {
+    if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
+    return refreshToken();
 }
 
 /**
@@ -42,6 +89,7 @@ export async function presignDownload(key: string): Promise<string> {
     const now = Date.now();
     if (cached && cached.expiresAt > now) return cached.url;
 
+    const token = await getToken();
     const res = await fetch(
         `${DAILEY_API_BASE}/projects/${PROJECT_ID}/storage/presign-download`,
         {
@@ -49,15 +97,17 @@ export async function presignDownload(key: string): Promise<string> {
             headers: {
                 "Content-Type": "application/json",
                 "X-Dailey-Source": "word-procurement",
-                Authorization: `Bearer ${getToken()}`,
+                Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ key, expires_in_seconds: PRESIGN_TTL_SECONDS }),
         },
     );
     if (!res.ok) {
         const body = await res.text().catch(() => "");
-        const tokLen = process.env.DAILEY_API_TOKEN?.length ?? 0;
-        console.error(`[dailey-presign] ${res.status} key=${key} tokLen=${tokLen} body=${body.slice(0, 200)}`);
+        // Drop the cached token on 401 so the NEXT request re-logins (subject
+        // to circuit breaker). Don't retry inline — that's how lockouts happen.
+        if (res.status === 401) cachedToken = null;
+        console.error(`[dailey-presign] ${res.status} key=${key} body=${body.slice(0, 200)}`);
         throw new Error(`Dailey presign failed: ${res.status} ${body.slice(0, 200)}`);
     }
     const data = (await res.json()) as { download_url?: string; url?: string };
