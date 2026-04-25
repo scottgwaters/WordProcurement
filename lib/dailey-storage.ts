@@ -60,11 +60,16 @@ export async function presignDownload(key: string): Promise<string> {
     const now = Date.now();
     if (cached && cached.expiresAt > now) return cached.url;
 
+    const bucket = getBucket();
     const url = await getSignedUrl(
         getClient(),
-        new GetObjectCommand({ Bucket: getBucket(), Key: key }),
+        new GetObjectCommand({ Bucket: bucket, Key: key }),
         { expiresIn: PRESIGN_TTL_SECONDS },
     );
+    // One-line trace per cache-miss so we can see whether S3_* env vars are
+    // wired correctly and what R2 path we're actually hitting. Strip once
+    // images are confirmed rendering.
+    console.log(`[s3] bucket=${bucket} key=${key} endpoint=${process.env.S3_ENDPOINT || "MISSING"} signed=${url.split("?")[0]}`);
 
     cache.set(key, { url, expiresAt: now + CACHE_TTL_MS });
     return url;
