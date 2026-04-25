@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { imageKeyForWord, presignDownload } from "@/lib/dailey-storage";
+import { fetchObject, imageKeyForWord } from "@/lib/dailey-storage";
 
 // GET /api/words/<id>/image
 // Looks up the word, computes its R2 object key, presigns a download URL via
@@ -30,20 +30,23 @@ export async function GET(
     }
 
     try {
-        const url = await presignDownload(imageKeyForWord(word));
-        // Tell the browser to keep this redirect for 30 min — that beats the
-        // server-side presign cache TTL (50 min) so the redirect target is
-        // still a valid signed URL when the browser uses it. Without this,
-        // every Previous/Next navigation makes a fresh server roundtrip even
-        // for words the reviewer has already seen this session.
-        const res = NextResponse.redirect(url, 302);
-        res.headers.set("Cache-Control", "private, max-age=1800");
-        return res;
+        const { body, contentType } = await fetchObject(imageKeyForWord(word));
+        // Stream the bytes back to the browser. Cache aggressively — image
+        // contents for a given word.id never change (re-generations land at
+        // the same key and overwrite), so the browser can hold these for
+        // a long time. 30 min is conservative; can extend to 24h once stable.
+        return new NextResponse(body as unknown as BodyInit, {
+            status: 200,
+            headers: {
+                "Content-Type": contentType || "image/png",
+                "Cache-Control": "private, max-age=1800",
+            },
+        });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error(`[img] ${word.id} presign failed: ${message}`);
+        console.error(`[img] ${word.id} fetch failed: ${message}`);
         return NextResponse.json(
-            { error: "Failed to presign image URL", detail: message },
+            { error: "Failed to fetch image", detail: message },
             { status: 500 },
         );
     }

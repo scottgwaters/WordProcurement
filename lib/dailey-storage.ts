@@ -19,6 +19,7 @@
 // out, nothing to truncate.
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import type { Readable } from "stream";
 
 const PRESIGN_TTL_SECONDS = 3600;     // signed URLs valid 1h
 const CACHE_TTL_MS = 50 * 60 * 1000;  // refresh before the URL actually expires
@@ -95,6 +96,32 @@ export async function presignDownload(key: string): Promise<string> {
 
     cache.set(key, { url, expiresAt: now + CACHE_TTL_MS });
     return url;
+}
+
+/**
+ * Server-side fetch of an object's bytes plus its content-type. Used as a
+ * fallback when the presigned-URL path can't be made to work (e.g. R2
+ * rejects the SDK's signature with SignatureDoesNotMatch). Streams through
+ * our server, so bytes cost bandwidth here rather than flowing browser↔R2
+ * directly — fine for 150KB images at low traffic.
+ */
+export async function fetchObject(key: string): Promise<{
+    body: Buffer;
+    contentType: string | undefined;
+}> {
+    const physicalKey = `${PROJECT_PREFIX}/${key}`;
+    const res = await getClient().send(
+        new GetObjectCommand({ Bucket: getBucket(), Key: physicalKey }),
+    );
+    const stream = res.Body as Readable;
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : Buffer.from(chunk));
+    }
+    return {
+        body: Buffer.concat(chunks),
+        contentType: res.ContentType,
+    };
 }
 
 /**
