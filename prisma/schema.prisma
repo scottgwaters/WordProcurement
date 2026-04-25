@@ -47,6 +47,8 @@ model Word {
   wordLength           Int       @map("word_length")
   hints                Json?
   pronunciation        String?
+  pronunciationArpabet String?   @map("pronunciation_arpabet")
+  pronunciationRespelling String? @map("pronunciation_respelling")
   partOfSpeech         String?   @map("part_of_speech")
   definition           String?   @db.Text
   exampleSentence      String?   @map("example_sentence") @db.Text

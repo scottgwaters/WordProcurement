@@ -16,6 +16,8 @@ type Variant = {
   category: string;
   hints: { easy?: string; medium?: string; hard?: string } | null;
   pronunciation: string | null;
+  pronunciation_arpabet: string | null;
+  pronunciation_respelling: string | null;
   part_of_speech: string | null;
   definition: string | null;
   example_sentence: string | null;
@@ -31,6 +33,8 @@ type SharedFields = {
   definition: string;
   part_of_speech: string;
   pronunciation: string;
+  pronunciation_arpabet: string;
+  pronunciation_respelling: string;
   example_sentence: string;
   heart_word_explanation: string;
   category: string;
@@ -56,6 +60,8 @@ export default function GroupedWordPage({
     definition: "",
     part_of_speech: "",
     pronunciation: "",
+    pronunciation_arpabet: "",
+    pronunciation_respelling: "",
     example_sentence: "",
     heart_word_explanation: "",
     category: "",
@@ -93,6 +99,8 @@ export default function GroupedWordPage({
       definition: first.definition ?? "",
       part_of_speech: first.part_of_speech ?? "",
       pronunciation: first.pronunciation ?? "",
+      pronunciation_arpabet: first.pronunciation_arpabet ?? "",
+      pronunciation_respelling: first.pronunciation_respelling ?? "",
       example_sentence: first.example_sentence ?? "",
       heart_word_explanation: first.heart_word_explanation ?? "",
       category: first.category ?? "",
@@ -140,6 +148,8 @@ export default function GroupedWordPage({
       ["definition", "definition"],
       ["part_of_speech", "part_of_speech"],
       ["pronunciation", "pronunciation"],
+      ["pronunciation_arpabet", "pronunciation_arpabet"],
+      ["pronunciation_respelling", "pronunciation_respelling"],
       ["example_sentence", "example_sentence"],
       ["heart_word_explanation", "heart_word_explanation"],
       ["category", "category"],
@@ -404,17 +414,61 @@ export default function GroupedWordPage({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+          </div>
+
+          {/* Pronunciation: three coordinated fields shared across all age
+              variants. Respelling is what kids see in the iOS UI; IPA is the
+              source of truth; ARPAbet is the CMUdict intermediate. */}
+          <div className="mb-4 border-t border-[var(--border-light)] pt-4">
+            <div className="flex items-baseline justify-between mb-2">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                 Pronunciation
-              </label>
-              <input
-                type="text"
-                value={shared.pronunciation}
-                onChange={(e) => setShared({ ...shared, pronunciation: e.target.value })}
-                className="input"
-                placeholder="/ˈdraɡən/"
-              />
+              </h3>
+              <span className="text-xs text-[var(--text-secondary)]">
+                Respelling shows under the word in-game
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Respelling (kid display)
+                </label>
+                <input
+                  type="text"
+                  value={shared.pronunciation_respelling}
+                  onChange={(e) =>
+                    setShared({ ...shared, pronunciation_respelling: e.target.value })
+                  }
+                  className="input"
+                  placeholder="DRAG-un"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  IPA (source of truth)
+                </label>
+                <input
+                  type="text"
+                  value={shared.pronunciation}
+                  onChange={(e) => setShared({ ...shared, pronunciation: e.target.value })}
+                  className="input"
+                  placeholder="/ˈdræɡən/"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  ARPAbet (CMUdict)
+                </label>
+                <input
+                  type="text"
+                  value={shared.pronunciation_arpabet}
+                  onChange={(e) =>
+                    setShared({ ...shared, pronunciation_arpabet: e.target.value })
+                  }
+                  className="input font-mono text-xs"
+                  placeholder="D R AE1 G AH0 N"
+                />
+              </div>
             </div>
           </div>
 

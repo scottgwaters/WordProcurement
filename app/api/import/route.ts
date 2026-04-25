@@ -16,6 +16,8 @@ interface WordEntry {
     hard?: string;
   };
   pronunciation?: string;
+  pronunciation_arpabet?: string;
+  pronunciation_respelling?: string;
   part_of_speech?: string;
   definition?: string;
   example_sentence?: string;
@@ -68,6 +70,8 @@ export async function POST(request: NextRequest) {
                 wordLength: w.word_length,
                 hints: w.hints ? (w.hints as Prisma.InputJsonValue) : Prisma.JsonNull,
                 pronunciation: w.pronunciation || null,
+                pronunciationArpabet: w.pronunciation_arpabet || null,
+                pronunciationRespelling: w.pronunciation_respelling || null,
                 partOfSpeech: w.part_of_speech || null,
                 definition: w.definition || null,
                 exampleSentence: w.example_sentence || null,
@@ -90,6 +94,8 @@ export async function POST(request: NextRequest) {
                 wordLength: w.word_length,
                 hints: w.hints ? (w.hints as Prisma.InputJsonValue) : Prisma.JsonNull,
                 pronunciation: w.pronunciation || null,
+                pronunciationArpabet: w.pronunciation_arpabet || null,
+                pronunciationRespelling: w.pronunciation_respelling || null,
                 partOfSpeech: w.part_of_speech || null,
                 definition: w.definition || null,
                 exampleSentence: w.example_sentence || null,

@@ -65,6 +65,8 @@ export default function WordDetailPage({
     example_sentence: "",
     part_of_speech: "",
     pronunciation: "",
+    pronunciation_arpabet: "",
+    pronunciation_respelling: "",
     heart_word_explanation: "",
   });
   // Version token read from the server on load; echoed on PATCH so the
@@ -109,6 +111,8 @@ export default function WordDetailPage({
       example_sentence: data.example_sentence || "",
       part_of_speech: data.part_of_speech || "",
       pronunciation: data.pronunciation || "",
+      pronunciation_arpabet: data.pronunciation_arpabet || "",
+      pronunciation_respelling: data.pronunciation_respelling || "",
       heart_word_explanation: data.heart_word_explanation || "",
     });
     setVersion(typeof data.version === "number" ? data.version : 0);
@@ -235,6 +239,8 @@ export default function WordDetailPage({
       example_sentence: formData.example_sentence || null,
       part_of_speech: formData.part_of_speech || null,
       pronunciation: formData.pronunciation || null,
+      pronunciation_arpabet: formData.pronunciation_arpabet || null,
+      pronunciation_respelling: formData.pronunciation_respelling || null,
       heart_word_explanation: formData.heart_word_explanation || null,
       // Optimistic concurrency token — if the server moved past this
       // version, it returns 409 instead of overwriting.
@@ -688,34 +694,82 @@ export default function WordDetailPage({
                     placeholder="A sentence using the word"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                      Part of Speech
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.part_of_speech}
-                      onChange={(e) =>
-                        setFormData({ ...formData, part_of_speech: e.target.value })
-                      }
-                      className="input"
-                      placeholder="noun, verb, adjective..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                    Part of Speech
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.part_of_speech}
+                    onChange={(e) =>
+                      setFormData({ ...formData, part_of_speech: e.target.value })
+                    }
+                    className="input"
+                    placeholder="noun, verb, adjective..."
+                  />
+                </div>
+
+                {/* Pronunciation: three coordinated fields. Respelling is what
+                    kids see in the iOS UI; IPA is the curator-facing source of
+                    truth; ARPAbet is the CMUdict intermediate. See PRONUNCIATION.md. */}
+                <div className="border-t border-[var(--border-light)] pt-4">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                       Pronunciation
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.pronunciation}
-                      onChange={(e) =>
-                        setFormData({ ...formData, pronunciation: e.target.value })
-                      }
-                      className="input"
-                      placeholder="Phonetic spelling"
-                    />
+                    </h3>
+                    <span className="text-xs text-[var(--text-secondary)]">
+                      Respelling is shown to kids in-game
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                        Respelling (kid display)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.pronunciation_respelling}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            pronunciation_respelling: e.target.value,
+                          })
+                        }
+                        className="input"
+                        placeholder="ARD-vark"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                        IPA (source of truth)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.pronunciation}
+                        onChange={(e) =>
+                          setFormData({ ...formData, pronunciation: e.target.value })
+                        }
+                        className="input"
+                        placeholder="/ˈɑːrdvɑːrk/"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                        ARPAbet (CMUdict)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.pronunciation_arpabet}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            pronunciation_arpabet: e.target.value,
+                          })
+                        }
+                        className="input font-mono text-xs"
+                        placeholder="AA1 R D V AA2 R K"
+                      />
+                    </div>
                   </div>
                 </div>
                 {formData.category === "heart_words" && (

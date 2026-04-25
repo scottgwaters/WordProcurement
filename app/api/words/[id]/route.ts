@@ -33,6 +33,8 @@ export async function GET(
     word_length: word.wordLength,
     hints: word.hints,
     pronunciation: word.pronunciation,
+    pronunciation_arpabet: word.pronunciationArpabet,
+    pronunciation_respelling: word.pronunciationRespelling,
     part_of_speech: word.partOfSpeech,
     definition: word.definition,
     example_sentence: word.exampleSentence,
@@ -96,6 +98,8 @@ export async function PATCH(
     example_sentence,
     part_of_speech,
     pronunciation,
+    pronunciation_arpabet,
+    pronunciation_respelling,
     heart_word_explanation,
     source,
     version: expectedVersion,
@@ -121,6 +125,8 @@ export async function PATCH(
           category: existingWord.category,
           hints: existingWord.hints,
           pronunciation: existingWord.pronunciation,
+          pronunciation_arpabet: existingWord.pronunciationArpabet,
+          pronunciation_respelling: existingWord.pronunciationRespelling,
           part_of_speech: existingWord.partOfSpeech,
           definition: existingWord.definition,
           example_sentence: existingWord.exampleSentence,
@@ -197,6 +203,20 @@ export async function PATCH(
     }
     updateData.pronunciation = newVal;
   }
+  if (pronunciation_arpabet !== undefined) {
+    const newVal = pronunciation_arpabet || null;
+    if (newVal !== existingWord.pronunciationArpabet) {
+      changes.pronunciation_arpabet = { old: existingWord.pronunciationArpabet, new: newVal };
+    }
+    updateData.pronunciationArpabet = newVal;
+  }
+  if (pronunciation_respelling !== undefined) {
+    const newVal = pronunciation_respelling || null;
+    if (newVal !== existingWord.pronunciationRespelling) {
+      changes.pronunciation_respelling = { old: existingWord.pronunciationRespelling, new: newVal };
+    }
+    updateData.pronunciationRespelling = newVal;
+  }
   if (heart_word_explanation !== undefined) {
     const newVal = heart_word_explanation || null;
     if (newVal !== existingWord.heartWordExplanation) {
@@ -265,6 +285,8 @@ export async function PATCH(
     word_length: updatedWord.wordLength,
     hints: updatedWord.hints,
     pronunciation: updatedWord.pronunciation,
+    pronunciation_arpabet: updatedWord.pronunciationArpabet,
+    pronunciation_respelling: updatedWord.pronunciationRespelling,
     part_of_speech: updatedWord.partOfSpeech,
     definition: updatedWord.definition,
     example_sentence: updatedWord.exampleSentence,

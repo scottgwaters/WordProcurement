@@ -12,6 +12,8 @@ const SHARED_FIELDS = [
   "definition",
   "partOfSpeech",
   "pronunciation",
+  "pronunciationArpabet",
+  "pronunciationRespelling",
   "exampleSentence",
   "heartWordExplanation",
   "category",
@@ -84,6 +86,8 @@ export async function PATCH(
     definition: "definition",
     part_of_speech: "partOfSpeech",
     pronunciation: "pronunciation",
+    pronunciation_arpabet: "pronunciationArpabet",
+    pronunciation_respelling: "pronunciationRespelling",
     example_sentence: "exampleSentence",
     heart_word_explanation: "heartWordExplanation",
     category: "category",
@@ -222,6 +226,8 @@ function transform(w: {
   wordLength: number;
   hints: Prisma.JsonValue;
   pronunciation: string | null;
+  pronunciationArpabet: string | null;
+  pronunciationRespelling: string | null;
   partOfSpeech: string | null;
   definition: string | null;
   exampleSentence: string | null;
@@ -243,6 +249,8 @@ function transform(w: {
     word_length: w.wordLength,
     hints: w.hints,
     pronunciation: w.pronunciation,
+    pronunciation_arpabet: w.pronunciationArpabet,
+    pronunciation_respelling: w.pronunciationRespelling,
     part_of_speech: w.partOfSpeech,
     definition: w.definition,
     example_sentence: w.exampleSentence,

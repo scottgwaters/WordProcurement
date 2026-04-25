@@ -17,8 +17,13 @@ export interface Word {
   category: string;
   word_length: number;
   hints: Hints | null;
-  // Educational metadata
+  // Educational metadata. Three pronunciation fields are populated together
+  // by the build-time generator (see PRONUNCIATION.md): IPA is the canonical
+  // source of truth, ARPAbet is the CMUdict intermediate, and the respelling
+  // is what the iOS UI shows under the word. Curators can override any one.
   pronunciation: string | null;
+  pronunciation_arpabet: string | null;
+  pronunciation_respelling: string | null;
   part_of_speech: string | null;
   definition: string | null;
   example_sentence: string | null;

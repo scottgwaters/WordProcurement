@@ -111,6 +111,32 @@ export default function WordCard({
         </section>
       )}
 
+      {/* Pronunciation — kid-display respelling is the headline; IPA + ARPAbet
+          are the fine-print so reviewers can audit. Hidden when nothing's set. */}
+      {(word.pronunciation_respelling || word.pronunciation || word.pronunciation_arpabet) && (
+        <section className="review-def">
+          <div className="review-section-label">Pronunciation</div>
+          {word.pronunciation_respelling && (
+            <div className="review-def__body">
+              {word.pronunciation_respelling}
+              <span className="text-xs text-[var(--text-secondary)] font-normal ml-2">
+                · shown in-game
+              </span>
+            </div>
+          )}
+          {(word.pronunciation || word.pronunciation_arpabet) && (
+            <div className="text-xs text-[var(--text-secondary)] mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {word.pronunciation && (
+                <span>IPA: <span className="font-mono">{word.pronunciation}</span></span>
+              )}
+              {word.pronunciation_arpabet && (
+                <span>ARPAbet: <span className="font-mono">{word.pronunciation_arpabet}</span></span>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* 2. Hints — bounded module with title bar and ordered rows */}
       {word.hints && (
         <section className="review-hints">
