@@ -78,7 +78,7 @@ export async function presignDownload(key: string): Promise<string> {
     // One-line trace per cache-miss so we can see whether S3_* env vars are
     // wired correctly and what R2 path we're actually hitting. Strip once
     // images are confirmed rendering.
-    console.log(`[s3] bucket=${bucket} key=${physicalKey} signed=${url.split("?")[0]}`);
+    console.log(`[s3] bucket=${bucket} key=${physicalKey} fullUrl=${url}`);
 
     cache.set(key, { url, expiresAt: now + CACHE_TTL_MS });
     return url;
