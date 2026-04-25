@@ -31,7 +31,14 @@ export async function GET(
 
     try {
         const url = await presignDownload(imageKeyForWord(word));
-        return NextResponse.redirect(url, 302);
+        // Tell the browser to keep this redirect for 30 min — that beats the
+        // server-side presign cache TTL (50 min) so the redirect target is
+        // still a valid signed URL when the browser uses it. Without this,
+        // every Previous/Next navigation makes a fresh server roundtrip even
+        // for words the reviewer has already seen this session.
+        const res = NextResponse.redirect(url, 302);
+        res.headers.set("Cache-Control", "private, max-age=1800");
+        return res;
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return NextResponse.json(

@@ -502,16 +502,40 @@ export default function ReviewPage() {
               </div>
 
               {currentWord && (
-                <WordCard
-                  word={currentWord}
-                  showActions
-                  onVerify={handleVerify}
-                  onReject={handleReject}
-                  onEdit={handleEdit}
-                  onFlag={handleFlag}
-                  onSkip={handleSkip}
-                  isLoading={isActing}
-                />
+                <>
+                  <WordCard
+                    word={currentWord}
+                    showActions
+                    onVerify={handleVerify}
+                    onReject={handleReject}
+                    onEdit={handleEdit}
+                    onFlag={handleFlag}
+                    onSkip={handleSkip}
+                    isLoading={isActing}
+                  />
+                  {/* Preload neighboring images so Previous/Next feels
+                      instant — by the time the reviewer hits the key, the
+                      browser already has the bytes. Hidden via
+                      width/height/overflow rather than display:none so the
+                      browser doesn't skip the request. */}
+                  <div
+                    aria-hidden
+                    style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }}
+                  >
+                    {[-1, 1, 2].map((delta) => {
+                      const w = words[currentIndex + delta];
+                      return w ? (
+                        <img
+                          key={w.id}
+                          src={`/api/words/${w.id}/image`}
+                          alt=""
+                          loading="eager"
+                          decoding="async"
+                        />
+                      ) : null;
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
