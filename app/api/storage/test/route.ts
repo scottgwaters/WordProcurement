@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchObject } from "@/lib/dailey-storage";
+import { S3Client, GetObjectCommand, ListObjectsV2Command, HeadBucketCommand } from "@aws-sdk/client-s3";
+import type { Readable } from "stream";
 
-// GET /api/storage/test?key=<key>
+// GET /api/storage/test?key=<key>&forcePathStyle=1&prefix=foo&bucket=other&op=list|head|get
 //
-// Diagnostic endpoint for the storage→R2 path. Auth is bearer-token
-// (IMPORT_API_TOKEN, same as /api/import) so it's curl-able from a
-// developer terminal without a browser session. middleware.ts permits
-// this path past the NextAuth redirect when the bearer matches.
+// Diagnostic endpoint — bearer-token gated. Lets the developer flip SDK
+// config knobs at request time without redeploying for each variation.
 //
-// Returns the SDK call result as JSON so I can iterate on credential /
-// SDK config / key shape without you needing to refresh the Review Queue.
+// Query params:
+//   key              — object key (required for op=get)
+//   bucket           — override S3_BUCKET_NAME
+//   prefix           — string to prepend to the key before signing
+//   forcePathStyle   — "1"/"true" to force path-style addressing
+//   op               — "get" (default) | "list" | "head"
 //
-// Strip this whole route once images are confirmed working in production
-// — it exposes nothing sensitive (no body bytes, just length and metadata)
-// but it's still a debug surface that doesn't belong long-term.
+// Returns the SDK call result + the env Dailey injected so we can see
+// every dimension at once.
 export async function GET(request: NextRequest) {
     const auth = request.headers.get("authorization") || "";
     const token = auth.replace(/^Bearer\s+/i, "");
@@ -22,42 +24,84 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const key = request.nextUrl.searchParams.get("key");
-    if (!key) {
-        return NextResponse.json(
-            { error: "Missing ?key=<storage-key>" },
-            { status: 400 },
-        );
+    const sp = request.nextUrl.searchParams;
+    const op = (sp.get("op") || "get").toLowerCase();
+    const rawKey = sp.get("key") || "";
+    const prefix = sp.get("prefix") || "";
+    const bucket = sp.get("bucket") || process.env.S3_BUCKET_NAME || "";
+    const fps = sp.get("forcePathStyle");
+    const forcePathStyle = fps === "1" || fps === "true";
+    const key = prefix ? `${prefix.replace(/\/$/, "")}/${rawKey}` : rawKey;
+
+    const env = {
+        S3_ENDPOINT: process.env.S3_ENDPOINT,
+        S3_REGION: process.env.S3_REGION,
+        S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+        keyIdLen: process.env.S3_ACCESS_KEY_ID?.length ?? 0,
+        secretLen: process.env.S3_SECRET_ACCESS_KEY?.length ?? 0,
+        keyIdHead: process.env.S3_ACCESS_KEY_ID?.slice(0, 8),
+    };
+
+    if (!env.S3_ENDPOINT || !process.env.S3_ACCESS_KEY_ID || !process.env.S3_SECRET_ACCESS_KEY) {
+        return NextResponse.json({ ok: false, error: "S3_* env vars missing", env }, { status: 200 });
     }
 
+    const client = new S3Client({
+        region: process.env.S3_REGION || "auto",
+        endpoint: process.env.S3_ENDPOINT,
+        credentials: {
+            accessKeyId: process.env.S3_ACCESS_KEY_ID,
+            secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+        },
+        ...(forcePathStyle ? { forcePathStyle: true } : {}),
+    });
+
+    const config = { op, bucket, key, prefix, forcePathStyle };
+
     try {
-        const { body, contentType } = await fetchObject(key);
+        if (op === "list") {
+            const res = await client.send(new ListObjectsV2Command({
+                Bucket: bucket,
+                Prefix: prefix || undefined,
+                MaxKeys: 5,
+            }));
+            return NextResponse.json({
+                ok: true, config, env,
+                count: res.KeyCount,
+                isTruncated: res.IsTruncated,
+                keys: res.Contents?.map((c) => c.Key) || [],
+            });
+        }
+        if (op === "head") {
+            await client.send(new HeadBucketCommand({ Bucket: bucket }));
+            return NextResponse.json({ ok: true, config, env, head: "bucket reachable" });
+        }
+        // default: get
+        if (!rawKey) {
+            return NextResponse.json({ ok: false, config, env, error: "?key required for op=get" }, { status: 200 });
+        }
+        const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+        const stream = res.Body as Readable;
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) {
+            chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : Buffer.from(chunk));
+        }
+        const body = Buffer.concat(chunks);
         return NextResponse.json({
-            ok: true,
-            key,
+            ok: true, config, env,
             bytes: body.length,
-            contentType,
+            contentType: res.ContentType,
         });
     } catch (err) {
-        const e = err as { name?: string; message?: string; $metadata?: unknown; stack?: string };
-        return NextResponse.json(
-            {
-                ok: false,
-                key,
-                errorName: e.name,
-                errorMessage: e.message,
-                metadata: e.$metadata,
-                stack: e.stack?.split("\n").slice(0, 6).join("\n"),
-                env: {
-                    S3_ENDPOINT: process.env.S3_ENDPOINT,
-                    S3_REGION: process.env.S3_REGION,
-                    S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
-                    keyIdLen: process.env.S3_ACCESS_KEY_ID?.length ?? 0,
-                    secretLen: process.env.S3_SECRET_ACCESS_KEY?.length ?? 0,
-                    keyIdHead: process.env.S3_ACCESS_KEY_ID?.slice(0, 8),
-                },
-            },
-            { status: 200 },  // 200 even on R2 error so curl shows the body
-        );
+        const e = err as { name?: string; message?: string; $metadata?: unknown; Code?: string };
+        return NextResponse.json({
+            ok: false,
+            config,
+            env,
+            errorName: e.name,
+            errorMessage: e.message,
+            errorCode: e.Code,
+            metadata: e.$metadata,
+        }, { status: 200 });
     }
 }
