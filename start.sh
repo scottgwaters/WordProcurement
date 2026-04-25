@@ -1,10 +1,8 @@
 #!/bin/sh
-echo "=== Environment Debug ==="
+# DB connectivity sanity-check without leaking the URL (which contains the
+# MySQL password) to logs. `dailey logs` is readable by anyone with project
+# access — keep secrets out of stdout.
 echo "DATABASE_URL is set: ${DATABASE_URL:+yes}"
-echo "All DB-related vars:"
-env | grep -i database || echo "None found"
-env | grep -i mysql || echo "None found"
-echo "=== End Debug ==="
 
 if [ -n "$DATABASE_URL" ]; then
   echo "Regenerating Prisma client..."

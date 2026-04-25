@@ -36,13 +36,7 @@ function getToken(): string {
 export async function presignDownload(key: string): Promise<string> {
     const cached = cache.get(key);
     const now = Date.now();
-    if (cached && cached.expiresAt > now) {
-        console.log(`[presign] cache hit: ${key}`);
-        return cached.url;
-    }
-
-    const tokenLen = process.env.DAILEY_API_TOKEN?.trim().length ?? 0;
-    console.log(`[presign] cache miss: ${key} (token len: ${tokenLen})`);
+    if (cached && cached.expiresAt > now) return cached.url;
 
     const res = await fetch(
         `${DAILEY_API_BASE}/projects/${PROJECT_ID}/storage/presign-download`,
@@ -58,19 +52,14 @@ export async function presignDownload(key: string): Promise<string> {
     );
     if (!res.ok) {
         const body = await res.text().catch(() => "");
-        console.error(`[presign] Dailey API ${res.status}: ${body.slice(0, 200)}`);
         // Don't cache failures — a transient 500 shouldn't blackhole the key
         // for the next 50 minutes.
         throw new Error(`Dailey presign failed: ${res.status} ${body.slice(0, 200)}`);
     }
     const data = (await res.json()) as { download_url?: string; url?: string };
     const url = data.download_url || data.url;
-    if (!url) {
-        console.error(`[presign] no URL in response: ${JSON.stringify(data).slice(0, 200)}`);
-        throw new Error("Dailey presign returned no URL");
-    }
+    if (!url) throw new Error("Dailey presign returned no URL");
 
-    console.log(`[presign] ok: ${key}`);
     cache.set(key, { url, expiresAt: now + CACHE_TTL_MS });
     return url;
 }
