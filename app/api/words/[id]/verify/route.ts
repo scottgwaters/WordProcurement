@@ -55,6 +55,8 @@ export async function POST(
     word_length: updatedWord.wordLength,
     hints: updatedWord.hints,
     pronunciation: updatedWord.pronunciation,
+    pronunciation_arpabet: updatedWord.pronunciationArpabet,
+    pronunciation_respelling: updatedWord.pronunciationRespelling,
     part_of_speech: updatedWord.partOfSpeech,
     definition: updatedWord.definition,
     example_sentence: updatedWord.exampleSentence,
