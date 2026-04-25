@@ -1,85 +1,76 @@
-// Server-side helper for talking to Dailey Storage.
+// Server-side helper for talking to Dailey Storage via the customer-API
+// presign path.
 //
-// Dailey Storage is S3-compatible. Per docs.dailey.cloud/docs/storage, when
-// an app has @aws-sdk/client-s3 in its package.json, Dailey auto-provisions
-// scoped R2 credentials as env vars on every deploy:
-//     S3_ENDPOINT, S3_REGION, S3_BUCKET_NAME, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY
-// Each project is isolated by a bucket prefix; our credentials can only
-// read/write under our own prefix, and the prefix is enforced transparently
-// at the storage layer — so we sign with `Key: 'words/foo.png'` (no project
-// id in the path) and the storage layer maps it to the physical
-// `<project-id>/words/foo.png`.
+// Dailey's storage product no longer auto-injects raw S3_* credentials
+// (per `dailey platform info`: "Upload and download access is issued
+// through presigned URLs instead of shared credentials"). The supported
+// integration is: hit POST /projects/<id>/storage/presign-download with a
+// Bearer token, get back a 1-hour signed R2 URL, redirect the browser
+// (or fetch+stream) to it.
 //
-// This file deliberately matches the docs example as closely as possible —
-// no `forcePathStyle`, no checksum overrides, no manual prefix mangling.
-// Each of those was added defensively in earlier iterations and each was
-// suspected of contributing to the SignatureDoesNotMatch loop. Starting
-// from the canonical config and only adding back what's demonstrably
-// required.
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-import type { Readable } from "stream";
+// Auth uses the project's DAILEY_API_TOKEN env var, which Dailey's
+// env-bundle now correctly preserves at full length (~1327 chars for the
+// JWT). Earlier in the project's history this same path was blocked by an
+// env-truncation bug (token arrived at the pod as 24 chars); per the
+// 2026-04-25 backend update that bug appears resolved for pre-existing
+// long values.
+const DAILEY_API_BASE = process.env.DAILEY_API_URL || "https://os.dailey.cloud/api";
+const PROJECT_ID = "fd5c82d9-1fd1-4f27-b10e-dd6ce36f1859";
+const PRESIGN_TTL_SECONDS = 3600;
+const CACHE_TTL_MS = 50 * 60 * 1000;  // refresh before R2's URL expires
 
-let s3Client: S3Client | null = null;
-function getClient(): S3Client {
-    if (s3Client) return s3Client;
-    const endpoint = process.env.S3_ENDPOINT;
-    const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-    if (!endpoint || !accessKeyId || !secretAccessKey) {
+type CachedPresign = { url: string; expiresAt: number };
+const cache = new Map<string, CachedPresign>();
+
+function getToken(): string {
+    const tok = process.env.DAILEY_API_TOKEN?.trim();
+    if (!tok) {
         throw new Error(
-            "Dailey S3 credentials missing. The pod should receive S3_ENDPOINT, " +
-            "S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY automatically when " +
-            "@aws-sdk/client-s3 is in package.json. If this fails, redeploy " +
-            "to trigger auto-provisioning.",
+            "DAILEY_API_TOKEN missing. The pod needs a Dailey access token " +
+            "to mint presigned download URLs. Set it via the Dailey dashboard.",
         );
     }
-    console.log(
-        `[s3-init] endpoint=${endpoint} region=${process.env.S3_REGION || "auto"} ` +
-        `bucket=${process.env.S3_BUCKET_NAME || "?"} keyIdLen=${accessKeyId.length} ` +
-        `secretLen=${secretAccessKey.length} keyIdHead=${accessKeyId.slice(0, 8)} ` +
-        `secretHead=${secretAccessKey.slice(0, 4)}`,
-    );
-    s3Client = new S3Client({
-        region: process.env.S3_REGION || "auto",
-        endpoint,
-        credentials: { accessKeyId, secretAccessKey },
-    });
-    return s3Client;
-}
-
-function getBucket(): string {
-    const bucket = process.env.S3_BUCKET_NAME;
-    if (!bucket) throw new Error("S3_BUCKET_NAME not set");
-    return bucket;
+    return tok;
 }
 
 /**
- * Server-side fetch of an object's bytes plus its content-type. Streams
- * through our server, so bytes cost bandwidth here rather than flowing
- * browser↔R2 directly — fine for 150KB images at low traffic.
+ * Ask Dailey's customer API to mint a presigned download URL for the given
+ * object key. Cached in-memory for ~50 min to avoid round-tripping per image.
  */
-export async function fetchObject(key: string): Promise<{
-    body: Buffer;
-    contentType: string | undefined;
-}> {
-    const res = await getClient().send(
-        new GetObjectCommand({ Bucket: getBucket(), Key: key }),
+export async function presignDownload(key: string): Promise<string> {
+    const cached = cache.get(key);
+    const now = Date.now();
+    if (cached && cached.expiresAt > now) return cached.url;
+
+    const res = await fetch(
+        `${DAILEY_API_BASE}/projects/${PROJECT_ID}/storage/presign-download`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Dailey-Source": "word-procurement",
+                Authorization: `Bearer ${getToken()}`,
+            },
+            body: JSON.stringify({ key, expires_in_seconds: PRESIGN_TTL_SECONDS }),
+        },
     );
-    const stream = res.Body as Readable;
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
-        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : Buffer.from(chunk));
+    if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        const tokLen = process.env.DAILEY_API_TOKEN?.length ?? 0;
+        console.error(`[dailey-presign] ${res.status} key=${key} tokLen=${tokLen} body=${body.slice(0, 200)}`);
+        throw new Error(`Dailey presign failed: ${res.status} ${body.slice(0, 200)}`);
     }
-    return {
-        body: Buffer.concat(chunks),
-        contentType: res.ContentType,
-    };
+    const data = (await res.json()) as { download_url?: string; url?: string };
+    const url = data.download_url || data.url;
+    if (!url) throw new Error("Dailey presign returned no URL");
+
+    cache.set(key, { url, expiresAt: now + CACHE_TTL_MS });
+    return url;
 }
 
 /**
- * Build the canonical R2 object key for a word. Sight + heart words share a
- * single illustration (see image-gen/generate.py SHARED_CATEGORIES); every
- * other category gets a per-word PNG keyed by the word UUID.
+ * Build the canonical R2 object key for a word. Sight + heart words share
+ * a single illustration; every other category gets a per-word PNG.
  */
 export function imageKeyForWord(word: { id: string; category: string }): string {
     if (word.category === "sight_words" || word.category === "heart_words") {

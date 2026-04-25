@@ -527,7 +527,7 @@ export default function ReviewPage() {
                       return w ? (
                         <img
                           key={w.id}
-                          src={`https://scottgwaters.com/wordnauts/${w.id}.png`}
+                          src={`/api/words/${w.id}/image`}
                           alt=""
                           loading="eager"
                           decoding="async"
