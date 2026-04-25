@@ -13,20 +13,50 @@ const PROJECT_ID = "fd5c82d9-1fd1-4f27-b10e-dd6ce36f1859";
 
 const PRESIGN_TTL_SECONDS = 3600;     // ask Dailey for max-life URLs
 const CACHE_TTL_MS = 50 * 60 * 1000;  // re-presign before R2's URL actually expires
+const TOKEN_REFRESH_TTL_MS = 50 * 60 * 1000;
 
 type CachedPresign = { url: string; expiresAt: number };
 const cache = new Map<string, CachedPresign>();
 
-function getToken(): string {
-    const tok = process.env.DAILEY_API_TOKEN?.trim();
-    if (!tok) {
+// Runtime-refreshed Dailey access token. We can't use DAILEY_API_TOKEN from
+// env because Dailey's env-injection path silently truncates long JWT values
+// (1327-char tokens arrive as 24-char fragments to the pod). Instead we log
+// in at runtime with email+password the same way the dailey CLI does, cache
+// the resulting JWT in-memory, and refresh before it expires. Bug filed
+// with Dailey — see dailey-env-truncation-bug.md in the Wordnauts repo.
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
+async function refreshToken(): Promise<string> {
+    const email = process.env.DAILEY_EMAIL?.trim();
+    const password = process.env.DAILEY_PASSWORD;
+    if (!email || !password) {
         throw new Error(
-            "DAILEY_API_TOKEN not set — image presigns won't work. " +
-            "Set it via `dailey env set DAILEY_API_TOKEN=<token>` " +
-            "(get the token value from `cat ~/Library/Preferences/dailey-nodejs/config.json`).",
+            "Dailey credentials missing. Set DAILEY_EMAIL and DAILEY_PASSWORD " +
+            "env vars on the deployment.",
         );
     }
+    const res = await fetch(`${DAILEY_API_BASE}/customers/login`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Dailey-Source": "word-procurement",
+        },
+        body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`Dailey login failed: ${res.status} ${body.slice(0, 200)}`);
+    }
+    const data = (await res.json()) as { access_token?: string; token?: string };
+    const tok = data.access_token || data.token;
+    if (!tok) throw new Error("Dailey login returned no access token");
+    cachedToken = { value: tok, expiresAt: Date.now() + TOKEN_REFRESH_TTL_MS };
     return tok;
+}
+
+async function getToken(): Promise<string> {
+    if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
+    return refreshToken();
 }
 
 /**
@@ -38,22 +68,30 @@ export async function presignDownload(key: string): Promise<string> {
     const now = Date.now();
     if (cached && cached.expiresAt > now) return cached.url;
 
-    const res = await fetch(
+    let token = await getToken();
+    const doFetch = (t: string) => fetch(
         `${DAILEY_API_BASE}/projects/${PROJECT_ID}/storage/presign-download`,
         {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "X-Dailey-Source": "word-procurement",
-                Authorization: `Bearer ${getToken()}`,
+                Authorization: `Bearer ${t}`,
             },
             body: JSON.stringify({ key, expires_in_seconds: PRESIGN_TTL_SECONDS }),
         },
     );
+
+    let res = await doFetch(token);
+    // If Dailey rotated our cached token behind our back, fetch a fresh one
+    // once and retry before giving up.
+    if (res.status === 401) {
+        cachedToken = null;
+        token = await refreshToken();
+        res = await doFetch(token);
+    }
     if (!res.ok) {
         const body = await res.text().catch(() => "");
-        const tokLen = process.env.DAILEY_API_TOKEN?.trim().length ?? 0;
-        console.error(`[presign] ${res.status} key=${key} tokLen=${tokLen} body=${body.slice(0, 200)}`);
         // Don't cache failures — a transient 500 shouldn't blackhole the key
         // for the next 50 minutes.
         throw new Error(`Dailey presign failed: ${res.status} ${body.slice(0, 200)}`);
