@@ -41,6 +41,7 @@ export async function GET(
         return res;
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        console.error(`[img] ${word.id} presign failed: ${message}`);
         return NextResponse.json(
             { error: "Failed to presign image URL", detail: message },
             { status: 500 },
