@@ -53,6 +53,13 @@ function getClient(): S3Client {
         endpoint,
         credentials: { accessKeyId, secretAccessKey },
         forcePathStyle: true, // R2 requires path-style addressing
+        // AWS SDK v3 adds `x-amz-checksum-mode=ENABLED` to every GetObject by
+        // default. Cloudflare R2 doesn't support that part of the SigV4
+        // checksum extension, so the canonical-request strings diverge and
+        // R2 rejects the signature with SignatureDoesNotMatch. WHEN_REQUIRED
+        // turns off the optional header so the request signs cleanly.
+        requestChecksumCalculation: "WHEN_REQUIRED",
+        responseChecksumValidation: "WHEN_REQUIRED",
     });
     return s3Client;
 }
