@@ -4,6 +4,7 @@ import type { Word } from "@/lib/types";
 import { worldForCategory } from "@/lib/worlds";
 import AgeBadge from "@/components/AgeBadge";
 import Link from "next/link";
+import { useState } from "react";
 
 interface WordCardProps {
   word: Word;
@@ -27,11 +28,24 @@ export default function WordCard({
   isLoading = false,
 }: WordCardProps) {
   const assignment = worldForCategory(word.category);
+  // Image generation lags behind word creation — when the asset doesn't exist
+  // yet, the API returns 302 → R2 404. Hide the slot rather than showing a
+  // broken-image icon next to the word.
+  const [imageFailed, setImageFailed] = useState(false);
   return (
     <div className="card p-6 transition-normal">
       {/* Header: word + chips + status — visually sealed with a bottom divider */}
       <div className="review-card-header">
-        <div>
+        {!imageFailed && (
+          <img
+            src={`/api/words/${word.id}/image`}
+            alt={`Illustration for ${word.word}`}
+            className="review-card-image"
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+          />
+        )}
+        <div className="review-card-header__main">
           <Link
             href={`/words/${word.id}`}
             className="word-display word-display--xl hover:text-[var(--accent)] transition-fast"

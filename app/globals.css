@@ -409,9 +409,30 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
   padding-bottom: 14px;
   border-bottom: 1px solid #eef0f3;
   margin-bottom: 18px;
+}
+
+/* Word illustration thumbnail. Sits to the left of the word title. Square
+   aspect, soft border so it reads as part of the card chrome rather than a
+   floating element. Bigger than a favicon, smaller than the word — the word
+   stays the visual anchor. */
+.review-card-image {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e8e2d4;
+  background: #f7f5f0;  /* matches the definition block's warm-neutral */
+}
+
+/* Take remaining space so the status badge stays right-aligned. */
+.review-card-header__main {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* Shared small-caps section label */
