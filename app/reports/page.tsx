@@ -22,12 +22,16 @@ const WORLD_BY_CATEGORY: Record<string, WorldId> = {};
 
 type Counts = { total: number; verified: number };
 
-function emptyMatrix(): Record<AgeGroup, Record<Level, Counts>> {
-  return {
-    "4-6":   { 1: { total: 0, verified: 0 }, 2: { total: 0, verified: 0 }, 3: { total: 0, verified: 0 } },
-    "7-9":   { 1: { total: 0, verified: 0 }, 2: { total: 0, verified: 0 }, 3: { total: 0, verified: 0 } },
-    "10-12": { 1: { total: 0, verified: 0 }, 2: { total: 0, verified: 0 }, 3: { total: 0, verified: 0 } },
-  };
+function emptyWorldMatrix(): Record<WorldId, Record<Level, Counts>> {
+  const out = {} as Record<WorldId, Record<Level, Counts>>;
+  WORLD_ORDER.forEach((w) => {
+    out[w] = {
+      1: { total: 0, verified: 0 },
+      2: { total: 0, verified: 0 },
+      3: { total: 0, verified: 0 },
+    };
+  });
+  return out;
 }
 
 export default async function ReportsPage() {
@@ -35,9 +39,9 @@ export default async function ReportsPage() {
   if (!session?.user) redirect("/login");
 
   // One groupBy over (category, ageGroup, level) gives us every cell of every
-  // world's matrix in a single round-trip. Categories are folded into worlds
-  // client-side using CATEGORIES_BY_WORLD so the UI stays in sync with the
-  // game's mapping (the source of truth lives in lib/worlds.ts).
+  // age group's matrix in a single round-trip. Categories are folded into
+  // worlds client-side using CATEGORIES_BY_WORLD so the UI stays in sync with
+  // the game's mapping (the source of truth lives in lib/worlds.ts).
   const [allCells, verifiedCells] = await Promise.all([
     prisma.word.groupBy({
       by: ["category", "ageGroup", "level"],
@@ -51,10 +55,10 @@ export default async function ReportsPage() {
     }),
   ]);
 
-  const byWorld: Record<WorldId, Record<AgeGroup, Record<Level, Counts>>> = {
-    animals: emptyMatrix(), food: emptyMatrix(), nature: emptyMatrix(),
-    space: emptyMatrix(), objects: emptyMatrix(), magic: emptyMatrix(),
-    sight: emptyMatrix(), feelings: emptyMatrix(),
+  const byAge: Record<AgeGroup, Record<WorldId, Record<Level, Counts>>> = {
+    "4-6":   emptyWorldMatrix(),
+    "7-9":   emptyWorldMatrix(),
+    "10-12": emptyWorldMatrix(),
   };
 
   const accumulate = (rows: typeof allCells, key: keyof Counts) => {
@@ -63,26 +67,22 @@ export default async function ReportsPage() {
       if (!worldId) return; // unknown category — surfaces in dashboard only
       const ag = row.ageGroup as AgeGroup;
       const lvl = row.level as Level;
-      if (!byWorld[worldId][ag]?.[lvl]) return;
-      byWorld[worldId][ag][lvl][key] += row._count._all;
+      if (!byAge[ag]?.[worldId]?.[lvl]) return;
+      byAge[ag][worldId][lvl][key] += row._count._all;
     });
   };
   accumulate(allCells, "total");
   accumulate(verifiedCells, "verified");
 
-  const worldTotals: Record<WorldId, Counts> = {} as Record<WorldId, Counts>;
-  WORLD_ORDER.forEach((worldId) => {
+  const ageTotals: Record<AgeGroup, Counts> = {} as Record<AgeGroup, Counts>;
+  AGE_GROUPS.forEach((ag) => {
     let total = 0, verified = 0;
-    AGE_GROUPS.forEach((ag) => LEVELS.forEach((lvl) => {
-      total += byWorld[worldId][ag][lvl].total;
-      verified += byWorld[worldId][ag][lvl].verified;
+    WORLD_ORDER.forEach((w) => LEVELS.forEach((l) => {
+      total += byAge[ag][w][l].total;
+      verified += byAge[ag][w][l].verified;
     }));
-    worldTotals[worldId] = { total, verified };
+    ageTotals[ag] = { total, verified };
   });
-
-  const sortedWorlds = [...WORLD_ORDER].sort(
-    (a, b) => worldTotals[b].total - worldTotals[a].total,
-  );
 
   return (
     <div className="min-h-screen">
@@ -90,28 +90,35 @@ export default async function ReportsPage() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-[var(--text-primary)]">
-            Words by World
+            Words by Age Group & World
           </h1>
           <p className="text-[var(--text-secondary)] mt-1">
-            Word counts broken out by world, age group, and difficulty level.
-            Each cell shows total / verified and links to the filtered word list.
+            For each age group, word counts broken out by world and difficulty
+            level. Each cell shows total / verified and links to the filtered
+            word list.
           </p>
         </div>
 
         <div className="space-y-8">
-          {sortedWorlds.map((worldId) => {
-            const world = WORLDS[worldId];
-            const matrix = byWorld[worldId];
-            const totals = worldTotals[worldId];
+          {AGE_GROUPS.map((ag) => {
+            const matrix = byAge[ag];
+            const totals = ageTotals[ag];
+            // Sort worlds by count within this age group so the heaviest
+            // buckets sit on top of each table — easier to scan progress.
+            const sortedWorlds = [...WORLD_ORDER].sort((a, b) => {
+              const aSum = LEVELS.reduce((s, l) => s + matrix[a][l].total, 0);
+              const bSum = LEVELS.reduce((s, l) => s + matrix[b][l].total, 0);
+              return bSum - aSum;
+            });
             return (
-              <section key={worldId} className="card p-6">
+              <section key={ag} className="card p-6">
                 <div className="flex items-baseline justify-between mb-4">
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <span>{world.emoji}</span>
-                    <span>{world.name}</span>
+                  <h2 className="text-lg font-semibold flex items-center gap-3">
+                    <AgeChip ageGroup={ag} />
+                    <span>Ages {ag}</span>
                   </h2>
                   <Link
-                    href={`/words?world=${worldId}`}
+                    href={`/words?ageGroup=${ag}`}
                     className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {totals.total.toLocaleString()} words
@@ -127,7 +134,7 @@ export default async function ReportsPage() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th className="w-32">Age Group</th>
+                        <th>World</th>
                         {LEVELS.map((lvl) => (
                           <th key={lvl} className="text-right">Level {lvl}</th>
                         ))}
@@ -135,20 +142,24 @@ export default async function ReportsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {AGE_GROUPS.map((ag) => {
+                      {sortedWorlds.map((worldId) => {
+                        const world = WORLDS[worldId];
                         const rowTotal = LEVELS.reduce(
-                          (s, l) => s + matrix[ag][l].total, 0,
+                          (s, l) => s + matrix[worldId][l].total, 0,
                         );
                         const rowVerified = LEVELS.reduce(
-                          (s, l) => s + matrix[ag][l].verified, 0,
+                          (s, l) => s + matrix[worldId][l].verified, 0,
                         );
                         return (
-                          <tr key={ag}>
+                          <tr key={worldId}>
                             <td>
-                              <AgeChip ageGroup={ag} />
+                              <span className="flex items-center gap-2">
+                                <span>{world.emoji}</span>
+                                <span>{world.name}</span>
+                              </span>
                             </td>
                             {LEVELS.map((lvl) => {
-                              const c = matrix[ag][lvl];
+                              const c = matrix[worldId][lvl];
                               return (
                                 <td key={lvl} className="text-right">
                                   <ReportCell
@@ -171,17 +182,17 @@ export default async function ReportsPage() {
                       <tr>
                         <td className="font-medium text-[var(--text-secondary)]">Total</td>
                         {LEVELS.map((lvl) => {
-                          const colTotal = AGE_GROUPS.reduce(
-                            (s, ag) => s + matrix[ag][lvl].total, 0,
+                          const colTotal = WORLD_ORDER.reduce(
+                            (s, w) => s + matrix[w][lvl].total, 0,
                           );
-                          const colVerified = AGE_GROUPS.reduce(
-                            (s, ag) => s + matrix[ag][lvl].verified, 0,
+                          const colVerified = WORLD_ORDER.reduce(
+                            (s, w) => s + matrix[w][lvl].verified, 0,
                           );
                           return (
                             <td key={lvl} className="text-right">
                               <ReportCell
                                 counts={{ total: colTotal, verified: colVerified }}
-                                href={`/words?world=${worldId}&level=${lvl}`}
+                                href={`/words?ageGroup=${ag}&level=${lvl}`}
                                 strong
                               />
                             </td>
@@ -190,7 +201,7 @@ export default async function ReportsPage() {
                         <td className="text-right">
                           <ReportCell
                             counts={totals}
-                            href={`/words?world=${worldId}`}
+                            href={`/words?ageGroup=${ag}`}
                             strong
                           />
                         </td>
