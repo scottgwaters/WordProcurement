@@ -6,9 +6,12 @@ import { CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 // GET /api/words/stats — word statistics.
 //
 // Query params (all optional):
-//   ageGroup   — restrict per-world counts to a single age group
-//   byWorld    — "1" to include countsByWorld in the response
-//   today      — "1" to include verifiedToday (words marked verified since local-midnight UTC)
+//   ageGroup        — restrict per-world counts to a single age group
+//   byWorld         — "1" to include countsByWorld in the response
+//   byWorldAndAge   — "1" to include pendingByWorldAndAge: a {ageGroup × world}
+//                     matrix of *pending* (unverified, undeclined) counts.
+//                     Powers the /review bucket picker.
+//   today           — "1" to include verifiedToday (words marked verified since local-midnight UTC)
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -18,6 +21,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const ageGroup = searchParams.get("ageGroup") || undefined;
   const byWorld = searchParams.get("byWorld") === "1";
+  const byWorldAndAge = searchParams.get("byWorldAndAge") === "1";
   const wantToday = searchParams.get("today") === "1";
 
   // Exclude declined words from every count — they're soft-deleted, so
@@ -65,6 +69,40 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // {ageGroup × world} pending matrix — powers the /review bucket picker.
+  // One groupBy(category, ageGroup) over the pending pool, then fold
+  // categories into worlds using the same mapping the dashboard uses.
+  let pendingByWorldAndAge:
+    | Record<string, Record<WorldId, number>>
+    | undefined;
+  if (byWorldAndAge) {
+    const pendingCells = await prisma.word.groupBy({
+      by: ["category", "ageGroup"],
+      _count: { _all: true },
+      where: { declined: false, verified: false },
+    });
+    const empty = (): Record<WorldId, number> => ({
+      animals: 0, food: 0, nature: 0, space: 0,
+      objects: 0, magic: 0, sight: 0, feelings: 0,
+    });
+    pendingByWorldAndAge = {
+      "4-6": empty(), "7-9": empty(), "10-12": empty(),
+    };
+    const worldByCategory: Record<string, WorldId> = {};
+    (Object.keys(CATEGORIES_BY_WORLD) as WorldId[]).forEach((wid) => {
+      CATEGORIES_BY_WORLD[wid].forEach((cat) => {
+        worldByCategory[cat] = wid;
+      });
+    });
+    pendingCells.forEach((row) => {
+      const wid = worldByCategory[row.category];
+      if (!wid) return;
+      const ag = row.ageGroup;
+      if (!pendingByWorldAndAge![ag]) return;
+      pendingByWorldAndAge![ag][wid] += row._count._all;
+    });
+  }
+
   // "Today" = server local-day boundary. Good enough for a progress signal;
   // we're not trying to match any specific user's timezone.
   let verifiedToday: number | undefined;
@@ -83,6 +121,7 @@ export async function GET(request: NextRequest) {
     declinedWords,
     categoryCounts,
     ...(countsByWorld ? { countsByWorld } : {}),
+    ...(pendingByWorldAndAge ? { pendingByWorldAndAge } : {}),
     ...(verifiedToday !== undefined ? { verifiedToday } : {}),
   });
 }

@@ -1,381 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import WordCard from "@/components/WordCard";
-import FilterBar from "@/components/FilterBar";
 import { useDialog } from "@/components/Dialog";
-import type { Word, WordFilters } from "@/lib/types";
-import { useRouter } from "next/navigation";
+import type { Word, AgeGroup } from "@/lib/types";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { WORLDS, type WorldId } from "@/lib/worlds";
+
+const AGE_GROUPS: AgeGroup[] = ["4-6", "7-9", "10-12"];
+const WORLD_ORDER: WorldId[] = [
+  "animals", "food", "nature", "space", "objects", "magic", "sight", "feelings",
+];
 
 export default function ReviewPage() {
-  const [words, setWords] = useState<Word[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [filters, setFilters] = useState<WordFilters & { world?: string }>({ verified: false });
-  const [isLoading, setIsLoading] = useState(true);
-  const [isActing, setIsActing] = useState(false);
-  const [stats, setStats] = useState({
-    reviewed: 0,
-    remaining: 0,
-    total: 0,
-    verifiedToday: 0,
-  });
-
-  // Refs mirror the active word so fetchWords can preserve position on a
-  // background refetch without putting words/currentIndex in its deps
-  // (which would loop the mount effect).
-  const wordsRef = useRef<Word[]>([]);
-  const currentIndexRef = useRef(0);
-  useEffect(() => {
-    wordsRef.current = words;
-    currentIndexRef.current = currentIndex;
-  }, [words, currentIndex]);
-
-  const router = useRouter();
-  const { status } = useSession();
-  const dlg = useDialog();
-
-  const fetchWords = useCallback(
-    async (opts?: { silent?: boolean }) => {
-      if (status !== "authenticated") return;
-
-      // Silent mode skips the spinner flash on background/poll refreshes.
-      // Only the initial load and filter-change refetches should show the
-      // loading state.
-      const silent = opts?.silent ?? false;
-      if (!silent) setIsLoading(true);
-
-      const params = new URLSearchParams();
-      params.set("verified", "false");
-      params.set("pageSize", "50");
-      // Skip words another reviewer is actively editing so two people don't
-      // land on the same pending word.
-      params.set("excludeLeased", "1");
-      if (filters.world) params.set("world", filters.world);
-      if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
-      if (filters.level) params.set("level", String(filters.level));
-      if (filters.flagged) params.set("flagged", "true");
-      if (filters.search) params.set("search", filters.search);
-
-      // Anchor by the current word's id so a background refetch doesn't
-      // dump the reviewer back to word 1.
-      const anchorId = wordsRef.current[currentIndexRef.current]?.id;
-
-      const response = await fetch(`/api/words?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        const serverWords: Word[] = data.words || [];
-
-        if (silent) {
-          // Merge: keep words the reviewer has already acted on this
-          // session (so Previous can still navigate back to them), keep
-          // local pending rows still in the server response, and append
-          // any newly-pending words the server returned.
-          const localActed = wordsRef.current.filter(
-            (w) => w.verified || w.declined
-          );
-          const actedIds = new Set(localActed.map((w) => w.id));
-          const serverIds = new Set(serverWords.map((w) => w.id));
-          const localPending = wordsRef.current.filter(
-            (w) => !w.verified && !w.declined && serverIds.has(w.id)
-          );
-          const localIds = new Set(
-            [...localActed, ...localPending].map((w) => w.id)
-          );
-          const newFromServer = serverWords.filter(
-            (w) => !localIds.has(w.id) && !actedIds.has(w.id)
-          );
-          const merged = [...localActed, ...localPending, ...newFromServer];
-          setWords(merged);
-
-          if (anchorId) {
-            const idx = merged.findIndex((w) => w.id === anchorId);
-            if (idx >= 0) setCurrentIndex(idx);
-          }
-        } else {
-          // Fresh load or filter-change: take server ordering as truth.
-          setWords(serverWords);
-          if (anchorId) {
-            const idx = serverWords.findIndex((w) => w.id === anchorId);
-            setCurrentIndex(
-              idx >= 0
-                ? idx
-                : Math.min(
-                    currentIndexRef.current,
-                    Math.max(0, serverWords.length - 1)
-                  )
-            );
-          } else {
-            setCurrentIndex(0);
-          }
-        }
-      }
-
-      // Stats — include today's count so the progress bar can show momentum.
-      const statsResponse = await fetch("/api/words/stats?today=1");
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setStats({
-          reviewed: statsData.verifiedWords || 0,
-          remaining: statsData.unverifiedWords || 0,
-          total: statsData.totalWords || 0,
-          verifiedToday: statsData.verifiedToday || 0,
-        });
-      }
-
-      if (!silent) setIsLoading(false);
-    },
-    [status, filters]
+  return (
+    <Suspense fallback={null}>
+      <ReviewInner />
+    </Suspense>
   );
+}
+
+function ReviewInner() {
+  const searchParams = useSearchParams();
+  const { status } = useSession();
+  const router = useRouter();
+
+  const ageGroup = searchParams.get("ageGroup") as AgeGroup | null;
+  const world = searchParams.get("world") as WorldId | null;
+  const bucketSelected =
+    !!ageGroup && !!world &&
+    AGE_GROUPS.includes(ageGroup) && WORLD_ORDER.includes(world);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    } else if (status === "authenticated") {
-      fetchWords();
-    }
-  }, [status, fetchWords, router]);
+    if (status === "unauthenticated") router.push("/login");
+  }, [status, router]);
 
-  // Keep the queue fresh: another reviewer may have approved/rejected
-  // words since this tab loaded. Refetch when the tab regains focus and
-  // once a minute while active — silently, so the word card doesn't flash
-  // a spinner under the reviewer.
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    const refresh = () => {
-      if (!isActing && document.visibilityState === "visible") {
-        fetchWords({ silent: true });
-      }
-    };
-    const onVisible = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", onVisible);
-    const interval = setInterval(refresh, 60_000);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(interval);
-    };
-  }, [status, isActing, fetchWords]);
-
-  // Advance to the next pending word (skipping any words the reviewer has
-  // already acted on in this session). Falls through to the literal next
-  // index if there's nothing pending ahead, so Previous still works.
-  const advanceToNextPending = () => {
-    const list = wordsRef.current;
-    const cursor = currentIndexRef.current;
-    for (let i = cursor + 1; i < list.length; i++) {
-      if (!list[i].verified && !list[i].declined) {
-        setCurrentIndex(i);
-        return;
-      }
-    }
-    // No pending left ahead — just land on the next index so the reviewer
-    // sees the "acted on" state of what they just decided.
-    setCurrentIndex(Math.min(cursor + 1, list.length - 1));
-  };
-
-  const handleVerify = async (wordId: string) => {
-    setIsActing(true);
-    const current = words.find((w) => w.id === wordId);
-    const wasPending = !!current && !current.verified && !current.declined;
-    const wasDeclined = !!current?.declined;
-
-    const response = await fetch(`/api/words/${wordId}/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ verified: true }),
-    });
-
-    if (response.ok) {
-      // Mark in place — don't shrink the list, so Previous can land on it.
-      setWords((prev) =>
-        prev.map((w) =>
-          w.id === wordId ? { ...w, verified: true, declined: false } : w
-        )
-      );
-      // Stats delta depends on the previous state:
-      //   pending  → verified: reviewed +1, remaining -1
-      //   declined → verified: reviewed +1 (no remaining change since declined was already out of the pending pool)
-      //   approved → approved: no change
-      setStats((prev) => {
-        if (wasPending) {
-          return {
-            ...prev,
-            reviewed: prev.reviewed + 1,
-            remaining: Math.max(0, prev.remaining - 1),
-            verifiedToday: prev.verifiedToday + 1,
-          };
-        }
-        if (wasDeclined) {
-          return {
-            ...prev,
-            reviewed: prev.reviewed + 1,
-            total: prev.total + 1, // re-entering the active pool
-            verifiedToday: prev.verifiedToday + 1,
-          };
-        }
-        return prev;
-      });
-      advanceToNextPending();
-    }
-
-    setIsActing(false);
-  };
-
-  const handleReject = async (wordId: string) => {
-    setIsActing(true);
-    const current = words.find((w) => w.id === wordId);
-    const wasPending = !!current && !current.verified && !current.declined;
-    const wasVerified = !!current?.verified;
-
-    await fetch(`/api/words/${wordId}/decline`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ declined: true }),
-    });
-
-    // Mark in place — don't shrink the list, so Previous can land on it.
-    setWords((prev) =>
-      prev.map((w) =>
-        w.id === wordId ? { ...w, declined: true, verified: false } : w
-      )
-    );
-    setStats((prev) => {
-      if (wasPending) {
-        return {
-          ...prev,
-          remaining: Math.max(0, prev.remaining - 1),
-          total: Math.max(0, prev.total - 1), // declined rows drop out of total
-        };
-      }
-      if (wasVerified) {
-        return {
-          ...prev,
-          reviewed: Math.max(0, prev.reviewed - 1),
-          total: Math.max(0, prev.total - 1),
-          verifiedToday: Math.max(0, prev.verifiedToday - 1),
-        };
-      }
-      return prev;
-    });
-    advanceToNextPending();
-
-    setIsActing(false);
-  };
-
-  const handleSkip = () => {
-    if (currentIndex < words.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-    } else if (words.length > 0) {
-      setCurrentIndex(0);
-    }
-  };
-
-  const handleEdit = (wordId: string) => {
-    router.push(`/words/${wordId}?from=review`);
-  };
-
-  const handleFlag = async (wordId: string) => {
-    const word = words.find((w) => w.id === wordId);
-    const alreadyFlagged = word?.flagged ?? false;
-
-    // Toggle: if the word is already flagged, clicking the (now active)
-    // Flag button un-flags it. Otherwise we prompt for an optional note
-    // and mark it flagged.
-    if (alreadyFlagged) {
-      setIsActing(true);
-      await fetch(`/api/words/${wordId}/flag`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flagged: false }),
-      });
-      setWords((prev) =>
-        prev.map((w) => (w.id === wordId ? { ...w, flagged: false } : w))
-      );
-      setIsActing(false);
-      return;
-    }
-
-    const reason = await dlg.prompt({
-      title: "Flag for another reviewer",
-      message: "What should they look at? Leave blank if you don't need to say.",
-      placeholder: "Optional note",
-      multiline: true,
-      okLabel: "Flag word",
-    });
-    if (reason === null) return; // cancelled
-    setIsActing(true);
-    await fetch(`/api/words/${wordId}/flag`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ flagged: true, reason: reason || undefined }),
-    });
-    // Reflect flagged state locally so the button shows active immediately.
-    setWords((prev) =>
-      prev.map((w) => (w.id === wordId ? { ...w, flagged: true } : w))
-    );
-    // Move past the flagged word to the next one so reviewer can keep moving
-    if (currentIndex < words.length - 1) {
-      setCurrentIndex((i) => i + 1);
-    }
-    setIsActing(false);
-  };
-
-  const currentWord = words[currentIndex];
-
-  // Keyboard shortcuts — let power users blow through the queue without
-  // reaching for the mouse. Ignored while a modal prompt is up (handleFlag
-  // uses window.prompt) or while focus is in an input/textarea so typing
-  // still works if a form is ever embedded on this page.
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable ||
-          target.tagName === "SELECT")
-      ) {
-        return;
-      }
-
-      const key = e.key.toLowerCase();
-      if (!currentWord || isActing) return;
-
-      if (key === "a") {
-        e.preventDefault();
-        handleVerify(currentWord.id);
-      } else if (key === "d") {
-        e.preventDefault();
-        handleReject(currentWord.id);
-      } else if (key === "e") {
-        e.preventDefault();
-        handleEdit(currentWord.id);
-      } else if (key === "f") {
-        e.preventDefault();
-        handleFlag(currentWord.id);
-      } else if (key === "s") {
-        e.preventDefault();
-        handleSkip();
-      } else if (key === "j" || e.key === "ArrowRight") {
-        e.preventDefault();
-        setCurrentIndex((i) => Math.min(words.length - 1, i + 1));
-      } else if (key === "k" || e.key === "ArrowLeft") {
-        e.preventDefault();
-        setCurrentIndex((i) => Math.max(0, i - 1));
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [currentWord, isActing, words.length]);
-
-  if (status === "loading") {
+  if (status === "loading" || status === "unauthenticated") {
     return (
       <div className="min-h-screen">
         <Header />
@@ -389,158 +52,362 @@ export default function ReviewPage() {
     );
   }
 
+  return bucketSelected ? (
+    <BucketReview ageGroup={ageGroup!} world={world!} />
+  ) : (
+    <BucketPicker />
+  );
+}
+
+// ---- Bucket picker -----------------------------------------------------------
+
+function BucketPicker() {
+  const [matrix, setMatrix] = useState<
+    Record<string, Record<WorldId, number>> | null
+  >(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/words/stats?byWorldAndAge=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setMatrix(data?.pendingByWorldAndAge ?? null);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="min-h-screen">
       <Header />
-
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-semibold text-[var(--text-primary)]">
-              Review Queue
-            </h1>
-            <p className="text-[var(--text-secondary)] mt-1">
-              Approve or reject words for the game
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-2xl font-semibold text-[var(--success)]">
-                {stats.reviewed}
-              </div>
-              <div className="text-xs text-[var(--text-secondary)]">Reviewed</div>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-semibold text-[var(--warning)]">
-                {stats.remaining}
-              </div>
-              <div className="text-xs text-[var(--text-secondary)]">Remaining</div>
-            </div>
-          </div>
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-semibold text-[var(--text-primary)]">
+            Pick a Review Bucket
+          </h1>
+          <p className="text-[var(--text-secondary)] mt-1">
+            Choose an age group and world to focus on. Each cell shows how many
+            words are still pending in that bucket.
+          </p>
         </div>
 
-        {/* Overall progress — a thin bar gives the reviewer a finish-line
-            signal, and the "X today" number nudges daily momentum. */}
-        {stats.total > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-              <span>
-                {stats.reviewed} / {stats.total} verified overall
-              </span>
-              <span>
-                {stats.verifiedToday} verified today
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
-              <div
-                className="h-full bg-[var(--success)] transition-all"
-                style={{
-                  width: `${Math.round((stats.reviewed / stats.total) * 100)}%`,
-                }}
-              />
-            </div>
+        {loading ? (
+          <div className="card p-12 text-center">
+            <div className="spinner mx-auto mb-4" />
+            <p className="text-[var(--text-secondary)]">Loading buckets...</p>
+          </div>
+        ) : (
+          <div className="card p-6 overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Age Group</th>
+                  {WORLD_ORDER.map((wid) => (
+                    <th key={wid} className="text-right">
+                      <span className="inline-flex items-center gap-1">
+                        <span>{WORLDS[wid].emoji}</span>
+                        <span className="hidden md:inline">{WORLDS[wid].name}</span>
+                      </span>
+                    </th>
+                  ))}
+                  <th className="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {AGE_GROUPS.map((ag) => {
+                  const row = matrix?.[ag] ?? {} as Record<WorldId, number>;
+                  const rowTotal = WORLD_ORDER.reduce(
+                    (s, w) => s + (row[w] ?? 0), 0,
+                  );
+                  return (
+                    <tr key={ag}>
+                      <td>
+                        <AgeChip ageGroup={ag} />
+                      </td>
+                      {WORLD_ORDER.map((wid) => {
+                        const count = row[wid] ?? 0;
+                        return (
+                          <td key={wid} className="text-right">
+                            <BucketCell
+                              count={count}
+                              href={`/review?ageGroup=${ag}&world=${wid}`}
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="text-right">
+                        <BucketCell
+                          count={rowTotal}
+                          href={`/words?ageGroup=${ag}&verified=false`}
+                          strong
+                          asLink={rowTotal > 0}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td className="font-medium text-[var(--text-secondary)]">Total</td>
+                  {WORLD_ORDER.map((wid) => {
+                    const colTotal = AGE_GROUPS.reduce(
+                      (s, ag) => s + (matrix?.[ag]?.[wid] ?? 0), 0,
+                    );
+                    return (
+                      <td key={wid} className="text-right">
+                        <BucketCell
+                          count={colTotal}
+                          href={`/words?world=${wid}&verified=false`}
+                          strong
+                          asLink={colTotal > 0}
+                        />
+                      </td>
+                    );
+                  })}
+                  <td className="text-right">
+                    <BucketCell
+                      count={AGE_GROUPS.reduce(
+                        (s, ag) => s + WORLD_ORDER.reduce(
+                          (t, w) => t + (matrix?.[ag]?.[w] ?? 0), 0,
+                        ), 0,
+                      )}
+                      href="/words?verified=false"
+                      strong
+                      asLink
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
-
-        <FilterBar
-          filters={filters}
-          onChange={(newFilters) => setFilters({ ...newFilters, verified: false })}
-          showStatus={false}
-          showFlaggedToggle
-        />
-
-        <div className="mt-6">
-          {isLoading ? (
-            <div className="card p-12 text-center">
-              <div className="spinner mx-auto mb-4" />
-              <p className="text-[var(--text-secondary)]">Loading words...</p>
-            </div>
-          ) : words.length === 0 ? (
-            <div className="card p-12 text-center">
-              <div className="text-4xl mb-4">🎉</div>
-              <h2 className="text-xl font-semibold mb-2">All caught up!</h2>
-              <p className="text-[var(--text-secondary)]">
-                No words pending review with current filters.
-              </p>
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-[var(--text-secondary)]">
-                  Word {currentIndex + 1} of {words.length}
-                  {(() => {
-                    const pending = words.filter(
-                      (w) => !w.verified && !w.declined
-                    ).length;
-                    return pending !== words.length ? (
-                      <>
-                        {" "}
-                        · <span className="font-medium">{pending}</span> still
-                        pending
-                      </>
-                    ) : null;
-                  })()}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
-                    disabled={currentIndex === 0}
-                    className="btn btn-secondary text-sm"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() =>
-                      setCurrentIndex(Math.min(words.length - 1, currentIndex + 1))
-                    }
-                    disabled={currentIndex === words.length - 1}
-                    className="btn btn-secondary text-sm"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-
-              {currentWord && (
-                <>
-                  <WordCard
-                    word={currentWord}
-                    showActions
-                    onVerify={handleVerify}
-                    onReject={handleReject}
-                    onEdit={handleEdit}
-                    onFlag={handleFlag}
-                    onSkip={handleSkip}
-                    isLoading={isActing}
-                  />
-                  {/* Preload neighboring images so Previous/Next feels
-                      instant — by the time the reviewer hits the key, the
-                      browser already has the bytes. Hidden via
-                      width/height/overflow rather than display:none so the
-                      browser doesn't skip the request. */}
-                  <div
-                    aria-hidden
-                    style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }}
-                  >
-                    {[-1, 1, 2].map((delta) => {
-                      const w = words[currentIndex + delta];
-                      return w ? (
-                        <img
-                          key={w.id}
-                          src={`/api/words/${w.id}/image`}
-                          alt=""
-                          loading="eager"
-                          decoding="async"
-                        />
-                      ) : null;
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
       </main>
     </div>
   );
+}
+
+function BucketCell({
+  count,
+  href,
+  strong,
+  asLink = true,
+}: {
+  count: number;
+  href: string;
+  strong?: boolean;
+  asLink?: boolean;
+}) {
+  if (count === 0) {
+    return <span className="text-[var(--text-tertiary)]">—</span>;
+  }
+  const label = (
+    <span className={strong ? "font-semibold" : "font-medium"}>
+      {count.toLocaleString()}
+    </span>
+  );
+  if (!asLink) return label;
+  return (
+    <Link href={href} className="hover:text-[var(--accent-hover)]">
+      {label}
+    </Link>
+  );
+}
+
+// ---- Bucket review (full scrolling list) -------------------------------------
+
+function BucketReview({ ageGroup, world }: { ageGroup: AgeGroup; world: WorldId }) {
+  const router = useRouter();
+  const dlg = useDialog();
+  const [words, setWords] = useState<Word[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actingId, setActingId] = useState<string | null>(null);
+
+  const worldMeta = WORLDS[world];
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams();
+    params.set("verified", "false");
+    params.set("world", world);
+    params.set("ageGroup", ageGroup);
+    // Pull the whole bucket so the reviewer can scroll through everything in
+    // one pass — buckets stay small (a few hundred at most) since they're
+    // scoped to one age × one world.
+    params.set("pageSize", "500");
+    fetch(`/api/words?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setWords(data?.words || []);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [ageGroup, world]);
+
+  const handleVerify = async (id: string) => {
+    setActingId(id);
+    const r = await fetch(`/api/words/${id}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verified: true }),
+    });
+    if (r.ok) {
+      // Mark in place — keep the row visible so reviewer sees their action
+      // and can undo by toggling back, but it drops out of "still pending".
+      setWords((prev) =>
+        prev.map((w) =>
+          w.id === id ? { ...w, verified: true, declined: false } : w,
+        ),
+      );
+    }
+    setActingId(null);
+  };
+
+  const handleReject = async (id: string) => {
+    setActingId(id);
+    await fetch(`/api/words/${id}/decline`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ declined: true }),
+    });
+    setWords((prev) =>
+      prev.map((w) =>
+        w.id === id ? { ...w, declined: true, verified: false } : w,
+      ),
+    );
+    setActingId(null);
+  };
+
+  const handleEdit = (id: string) => router.push(`/words/${id}?from=review`);
+
+  const handleFlag = async (id: string) => {
+    const word = words.find((w) => w.id === id);
+    const alreadyFlagged = word?.flagged ?? false;
+    if (alreadyFlagged) {
+      setActingId(id);
+      await fetch(`/api/words/${id}/flag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagged: false }),
+      });
+      setWords((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, flagged: false } : w)),
+      );
+      setActingId(null);
+      return;
+    }
+    const reason = await dlg.prompt({
+      title: "Flag for another reviewer",
+      message: "What should they look at? Leave blank if you don't need to say.",
+      placeholder: "Optional note",
+      multiline: true,
+      okLabel: "Flag word",
+    });
+    if (reason === null) return;
+    setActingId(id);
+    await fetch(`/api/words/${id}/flag`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flagged: true, reason: reason || undefined }),
+    });
+    setWords((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, flagged: true } : w)),
+    );
+    setActingId(null);
+  };
+
+  const pendingCount = words.filter((w) => !w.verified && !w.declined).length;
+  const verifiedCount = words.filter((w) => w.verified).length;
+  const declinedCount = words.filter((w) => w.declined).length;
+
+  return (
+    <div className="min-h-screen">
+      <Header />
+      <main className="max-w-4xl mx-auto px-6 py-8">
+        <div className="mb-6">
+          <Link
+            href="/review"
+            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          >
+            ← Change bucket
+          </Link>
+          <div className="flex items-center justify-between mt-2 gap-4 flex-wrap">
+            <h1 className="text-3xl font-semibold text-[var(--text-primary)] flex items-center gap-3 flex-wrap">
+              <AgeChip ageGroup={ageGroup} />
+              <span>Ages {ageGroup}</span>
+              <span className="text-[var(--text-secondary)]">·</span>
+              <span className="flex items-center gap-2">
+                <span>{worldMeta.emoji}</span>
+                <span>{worldMeta.name}</span>
+              </span>
+            </h1>
+            <div className="flex items-center gap-4 text-right">
+              <div>
+                <div className="text-2xl font-semibold text-[var(--warning)]">
+                  {pendingCount}
+                </div>
+                <div className="text-xs text-[var(--text-secondary)]">Pending</div>
+              </div>
+              <div>
+                <div className="text-2xl font-semibold text-[var(--success)]">
+                  {verifiedCount}
+                </div>
+                <div className="text-xs text-[var(--text-secondary)]">Verified</div>
+              </div>
+              {declinedCount > 0 && (
+                <div>
+                  <div className="text-2xl font-semibold text-[var(--error)]">
+                    {declinedCount}
+                  </div>
+                  <div className="text-xs text-[var(--text-secondary)]">Declined</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="card p-12 text-center">
+            <div className="spinner mx-auto mb-4" />
+            <p className="text-[var(--text-secondary)]">Loading words...</p>
+          </div>
+        ) : words.length === 0 ? (
+          <div className="card p-12 text-center">
+            <div className="text-4xl mb-4">🎉</div>
+            <h2 className="text-xl font-semibold mb-2">All caught up!</h2>
+            <p className="text-[var(--text-secondary)]">
+              No words pending review in this bucket.
+            </p>
+            <Link href="/review" className="btn btn-secondary mt-6 inline-flex">
+              Pick another bucket
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {words.map((w) => (
+              <WordCard
+                key={w.id}
+                word={w}
+                showActions
+                onVerify={handleVerify}
+                onReject={handleReject}
+                onEdit={handleEdit}
+                onFlag={handleFlag}
+                isLoading={actingId === w.id}
+              />
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function AgeChip({ ageGroup }: { ageGroup: AgeGroup }) {
+  const cls =
+    ageGroup === "4-6" ? "badge-age-46"
+    : ageGroup === "7-9" ? "badge-age-79"
+    : "badge-age-1012";
+  return <span className={`badge ${cls}`}>{ageGroup}</span>;
 }
