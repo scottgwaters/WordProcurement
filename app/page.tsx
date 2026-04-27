@@ -110,7 +110,15 @@ export default async function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Words by world — each row deep-links to /words pre-filtered. */}
           <div className="card p-6">
-            <h2 className="text-lg font-semibold mb-4">Words by World</h2>
+            <div className="flex items-baseline justify-between mb-4">
+              <h2 className="text-lg font-semibold">Words by World</h2>
+              <Link
+                href="/reports"
+                className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                Detailed report →
+              </Link>
+            </div>
             <div className="space-y-1">
               {(Object.keys(worldCounts) as WorldId[])
                 .sort((a, b) => worldCounts[b] - worldCounts[a])
