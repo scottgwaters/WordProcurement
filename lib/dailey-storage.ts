@@ -13,6 +13,15 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 const PRESIGN_TTL_SECONDS = 3600;
 const CACHE_TTL_MS = 50 * 60 * 1000;
 
+// HACK: Dailey injects S3_KEY_PREFIX="scottwaters/word-procurement/" (legacy
+// form) but the actual stored objects live under "<project-id>/". Verified
+// via Dailey's own MCP `storage_presign_download` 2026-04-28 — its URL uses
+// the project-id prefix and resolves to the real file. Filed back; remove
+// this constant and use process.env.S3_KEY_PREFIX once Dailey fixes the
+// env-var injection (or once we're moved to per-project R2 buckets, where
+// the prefix becomes empty entirely).
+const STORAGE_KEY_PREFIX = "fd5c82d9-1fd1-4f27-b10e-dd6ce36f1859/";
+
 type CachedPresign = { url: string; expiresAt: number };
 const cache = new Map<string, CachedPresign>();
 
@@ -48,7 +57,7 @@ export async function presignDownload(key: string): Promise<string> {
     if (cached && cached.expiresAt > now) return cached.url;
 
     const bucket = process.env.S3_BUCKET_NAME;
-    const prefix = process.env.S3_KEY_PREFIX ?? "";
+    const prefix = STORAGE_KEY_PREFIX;
     if (!bucket) throw new Error("S3_BUCKET_NAME missing from pod env");
 
     try {
