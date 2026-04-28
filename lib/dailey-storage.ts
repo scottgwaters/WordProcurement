@@ -1,23 +1,16 @@
 // Server-side helper for talking to Dailey Storage via the customer-API
 // presign path.
 //
-// Auth uses the project's DAILEY_API_TOKEN env var. Per Dailey's
-// 2026-04-25 backend update, the duplicate-row bug that was causing this
-// token to arrive at the pod truncated to 24 chars is fixed for existing
-// values — confirmed via `dailey env runtime-list`: DAILEY_API_TOKEN
-// is now 1327 chars on the pod, intact.
+// Auth uses the project's DAILEY_API_TOKEN env var (a dashboard-issued
+// opaque token, ≥30 chars). We deliberately don't use email+password
+// runtime login — that path tripped a 423 lockout in earlier debugging
+// when DAILEY_PASSWORD didn't match, and the lockout extended on every
+// retry.
 //
-// We deliberately don't use email+password runtime login here. Earlier
-// in the day's debug cycle that path tripped a 423 lockout when
-// DAILEY_PASSWORD on the deployment didn't match, and the lockout
-// extended on every subsequent image request. With DAILEY_API_TOKEN
-// stable, there's no need.
-//
-// We deliberately don't use the SDK + S3_* env vars path either —
-// despite @aws-sdk/client-s3 being in package.json (per docs, that
-// should auto-inject S3_* vars), runtime-list confirms no S3_* vars
-// are present in our pod. Filed with Dailey; this path was never
-// reaching us.
+// We also deliberately don't use the @aws-sdk/client-s3 + S3_* env
+// vars path: despite @aws-sdk/client-s3 being in package.json,
+// runtime-list confirms no S3_* vars reach our pod (storage envFrom
+// secret missing). Filed with Dailey.
 const DAILEY_API_BASE = process.env.DAILEY_API_URL || "https://os.dailey.cloud/api";
 const PROJECT_ID = "fd5c82d9-1fd1-4f27-b10e-dd6ce36f1859";
 const PRESIGN_TTL_SECONDS = 3600;
@@ -33,13 +26,14 @@ function getToken(): string {
             "DAILEY_API_TOKEN missing from pod env. Set it via the Dailey dashboard.",
         );
     }
-    if (tok.length < 100) {
-        // Defense against the env-truncation regression: a real Dailey JWT is
-        // 1000+ chars. Anything shorter is the truncated stub from the dup-row
-        // bug and won't authenticate. Fail fast with a clear hint.
+    if (tok.length < 30) {
+        // Defense against the env-injection regression that clobbered the
+        // customer value with a 24-char auto-generated stub. A real
+        // dashboard-issued token is ≥30 chars; anything shorter is the stub
+        // and won't authenticate. Fail fast with a clear hint.
         throw new Error(
-            `DAILEY_API_TOKEN looks truncated (${tok.length} chars; expect ~1327). ` +
-            `Likely the duplicate-row env-injection bug. Re-set via dashboard and restart pod.`,
+            `DAILEY_API_TOKEN looks like the auto-gen stub (${tok.length} chars). ` +
+            `Re-set via dashboard and restart pod.`,
         );
     }
     return tok;
