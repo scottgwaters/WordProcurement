@@ -304,6 +304,40 @@ textarea.input { height: auto; padding: 8px 12px; min-height: 80px; }
   border-color: #a5b4fc;
 }
 
+/* Grade-level palette — six steps from warm yellow (Pre-K) through
+   teal (K) and greens (1st–2nd) to indigo (4th), so reviewers can
+   read the grade at a glance the way the old age palette worked. */
+.badge-grade-prek {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+.badge-grade-k {
+  background: #ccfbf1;
+  color: #115e59;
+  border-color: #5eead4;
+}
+.badge-grade-1 {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+.badge-grade-2 {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+.badge-grade-3 {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+.badge-grade-4 {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #a5b4fc;
+}
+
 /* ---------- Stat card ---------- */
 .stat-card {
   background: var(--bg-primary);
@@ -427,6 +461,27 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   border-radius: 8px;
   border: 1px solid #e8e2d4;
   background: #f7f5f0;  /* matches the definition block's warm-neutral */
+  display: block;
+}
+
+/* Wraps the thumbnail so it can be clicked to open the lightbox without
+   inheriting button chrome. Hover/focus tweaks signal it's interactive. */
+.review-card-image-button {
+  flex: 0 0 auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: zoom-in;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.review-card-image-button:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.review-card-image-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Take remaining space so the status badge stays right-aligned. */

@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const world = searchParams.get("world");
   const ageGroup = searchParams.get("ageGroup");
+  const gradeLevel = searchParams.get("gradeLevel");
+  const ungraded = searchParams.get("ungraded") === "true";
   const level = searchParams.get("level");
   const verified = searchParams.get("verified");
   const flagged = searchParams.get("flagged");
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
   const where: {
     category?: string | { in: string[] };
     ageGroup?: string;
+    gradeLevel?: string | null;
     level?: number;
     verified?: boolean;
     declined?: boolean;
@@ -54,6 +57,11 @@ export async function GET(request: NextRequest) {
     where.category = { in: CATEGORIES_BY_WORLD[world as WorldId] };
   }
   if (ageGroup) where.ageGroup = ageGroup;
+  if (ungraded) {
+    where.gradeLevel = null;
+  } else if (gradeLevel) {
+    where.gradeLevel = gradeLevel;
+  }
   if (level) where.level = parseInt(level);
   if (verified !== null) where.verified = verified === "true";
   if (search) where.word = { contains: search };
@@ -104,6 +112,7 @@ export async function GET(request: NextRequest) {
     id: w.id,
     word: w.word,
     age_group: w.ageGroup,
+    grade_level: w.gradeLevel,
     level: w.level,
     category: w.category,
     word_length: w.wordLength,
@@ -146,6 +155,7 @@ export async function POST(request: NextRequest) {
     word,
     category,
     age_group,
+    grade_level,
     level,
     hints,
     definition,
@@ -169,6 +179,7 @@ export async function POST(request: NextRequest) {
       word: word.toUpperCase(),
       category,
       ageGroup: age_group,
+      gradeLevel: grade_level ?? null,
       level,
       wordLength: word.length,
       hints: hints || null,
@@ -198,6 +209,7 @@ export async function POST(request: NextRequest) {
     id: newWord.id,
     word: newWord.word,
     age_group: newWord.ageGroup,
+    grade_level: newWord.gradeLevel,
     level: newWord.level,
     category: newWord.category,
     word_length: newWord.wordLength,

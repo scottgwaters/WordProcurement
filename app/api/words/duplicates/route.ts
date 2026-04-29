@@ -30,11 +30,12 @@ export async function GET(request: NextRequest) {
       id: true,
       word: true,
       ageGroup: true,
+      gradeLevel: true,
       level: true,
       category: true,
       verified: true,
     },
-    orderBy: [{ ageGroup: "asc" }, { level: "asc" }],
+    orderBy: [{ gradeLevel: "asc" }, { level: "asc" }],
   });
 
   return NextResponse.json({ duplicates });

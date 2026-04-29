@@ -4,13 +4,21 @@ import { Suspense, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import WordCard from "@/components/WordCard";
-import { useDialog } from "@/components/Dialog";
-import type { Word, AgeGroup } from "@/lib/types";
+import FlagDialog, { type FlagDialogResult } from "@/components/FlagDialog";
+import type { Word, GradeLevel } from "@/lib/types";
+import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
+import GradeBadge from "@/components/GradeBadge";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { WORLDS, type WorldId } from "@/lib/worlds";
 
-const AGE_GROUPS: AgeGroup[] = ["4-6", "7-9", "10-12"];
+// Picker rows: the six grades plus an "ungraded" row that surfaces words
+// without a grade tag yet (should be empty post-curation but kept as a
+// safety net for any future imports).
+const GRADE_ROWS: (GradeLevel | "ungraded")[] = [
+  ...GRADE_LEVELS,
+  "ungraded",
+];
 const WORLD_ORDER: WorldId[] = [
   "animals", "food", "nature", "space", "objects", "magic", "sight", "feelings",
 ];
@@ -28,11 +36,13 @@ function ReviewInner() {
   const { status } = useSession();
   const router = useRouter();
 
-  const ageGroup = searchParams.get("ageGroup") as AgeGroup | null;
+  const gradeLevelParam = searchParams.get("gradeLevel");
   const world = searchParams.get("world") as WorldId | null;
+  const isValidGradeRow = (v: string | null): v is GradeLevel | "ungraded" =>
+    v !== null && (GRADE_ROWS as string[]).includes(v);
   const bucketSelected =
-    !!ageGroup && !!world &&
-    AGE_GROUPS.includes(ageGroup) && WORLD_ORDER.includes(world);
+    !!gradeLevelParam && !!world &&
+    isValidGradeRow(gradeLevelParam) && WORLD_ORDER.includes(world);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -53,7 +63,7 @@ function ReviewInner() {
   }
 
   return bucketSelected ? (
-    <BucketReview ageGroup={ageGroup!} world={world!} />
+    <BucketReview gradeRow={gradeLevelParam as GradeLevel | "ungraded"} world={world!} />
   ) : (
     <BucketPicker />
   );
@@ -69,11 +79,11 @@ function BucketPicker() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/words/stats?byWorldAndAge=1")
+    fetch("/api/words/stats?byWorldAndGrade=1")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled) return;
-        setMatrix(data?.pendingByWorldAndAge ?? null);
+        setMatrix(data?.pendingByWorldAndGrade ?? null);
         setLoading(false);
       });
     return () => { cancelled = true; };
@@ -88,7 +98,7 @@ function BucketPicker() {
             Pick a Review Bucket
           </h1>
           <p className="text-[var(--text-secondary)] mt-1">
-            Choose an age group and world to focus on. Each cell shows how many
+            Choose a grade and world to focus on. Each cell shows how many
             words are still pending in that bucket.
           </p>
         </div>
@@ -103,7 +113,7 @@ function BucketPicker() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Age Group</th>
+                  <th>Grade</th>
                   {WORLD_ORDER.map((wid) => (
                     <th key={wid} className="text-right">
                       <span className="inline-flex items-center gap-1">
@@ -116,15 +126,26 @@ function BucketPicker() {
                 </tr>
               </thead>
               <tbody>
-                {AGE_GROUPS.map((ag) => {
-                  const row = matrix?.[ag] ?? {} as Record<WorldId, number>;
+                {GRADE_ROWS.map((g) => {
+                  const row = matrix?.[g] ?? {} as Record<WorldId, number>;
                   const rowTotal = WORLD_ORDER.reduce(
                     (s, w) => s + (row[w] ?? 0), 0,
                   );
+                  // Hide the ungraded row when there's nothing in it — once
+                  // the corpus is fully graded this row should disappear.
+                  if (g === "ungraded" && rowTotal === 0) return null;
+                  const wordsHref =
+                    g === "ungraded"
+                      ? `/words?ungraded=true&verified=false`
+                      : `/words?gradeLevel=${g}&verified=false`;
                   return (
-                    <tr key={ag}>
+                    <tr key={g}>
                       <td>
-                        <AgeChip ageGroup={ag} />
+                        {g === "ungraded" ? (
+                          <span className="badge badge-warning">⚠ Ungraded</span>
+                        ) : (
+                          <GradeBadge value={g} />
+                        )}
                       </td>
                       {WORLD_ORDER.map((wid) => {
                         const count = row[wid] ?? 0;
@@ -132,7 +153,7 @@ function BucketPicker() {
                           <td key={wid} className="text-right">
                             <BucketCell
                               count={count}
-                              href={`/review?ageGroup=${ag}&world=${wid}`}
+                              href={`/review?gradeLevel=${g}&world=${wid}`}
                             />
                           </td>
                         );
@@ -140,7 +161,7 @@ function BucketPicker() {
                       <td className="text-right">
                         <BucketCell
                           count={rowTotal}
-                          href={`/words?ageGroup=${ag}&verified=false`}
+                          href={wordsHref}
                           strong
                           asLink={rowTotal > 0}
                         />
@@ -151,8 +172,8 @@ function BucketPicker() {
                 <tr>
                   <td className="font-medium text-[var(--text-secondary)]">Total</td>
                   {WORLD_ORDER.map((wid) => {
-                    const colTotal = AGE_GROUPS.reduce(
-                      (s, ag) => s + (matrix?.[ag]?.[wid] ?? 0), 0,
+                    const colTotal = GRADE_ROWS.reduce(
+                      (s, g) => s + (matrix?.[g]?.[wid] ?? 0), 0,
                     );
                     return (
                       <td key={wid} className="text-right">
@@ -167,9 +188,9 @@ function BucketPicker() {
                   })}
                   <td className="text-right">
                     <BucketCell
-                      count={AGE_GROUPS.reduce(
-                        (s, ag) => s + WORLD_ORDER.reduce(
-                          (t, w) => t + (matrix?.[ag]?.[w] ?? 0), 0,
+                      count={GRADE_ROWS.reduce(
+                        (s, g) => s + WORLD_ORDER.reduce(
+                          (t, w) => t + (matrix?.[g]?.[w] ?? 0), 0,
                         ), 0,
                       )}
                       href="/words?verified=false"
@@ -216,12 +237,18 @@ function BucketCell({
 
 // ---- Bucket review (full scrolling list) -------------------------------------
 
-function BucketReview({ ageGroup, world }: { ageGroup: AgeGroup; world: WorldId }) {
+function BucketReview({
+  gradeRow,
+  world,
+}: {
+  gradeRow: GradeLevel | "ungraded";
+  world: WorldId;
+}) {
   const router = useRouter();
-  const dlg = useDialog();
   const [words, setWords] = useState<Word[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [flagTargetId, setFlagTargetId] = useState<string | null>(null);
 
   const worldMeta = WORLDS[world];
 
@@ -230,10 +257,14 @@ function BucketReview({ ageGroup, world }: { ageGroup: AgeGroup; world: WorldId 
     const params = new URLSearchParams();
     params.set("verified", "false");
     params.set("world", world);
-    params.set("ageGroup", ageGroup);
+    if (gradeRow === "ungraded") {
+      params.set("ungraded", "true");
+    } else {
+      params.set("gradeLevel", gradeRow);
+    }
     // Pull the whole bucket so the reviewer can scroll through everything in
     // one pass — buckets stay small (a few hundred at most) since they're
-    // scoped to one age × one world.
+    // scoped to one grade × one world.
     params.set("pageSize", "500");
     fetch(`/api/words?${params.toString()}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -243,7 +274,7 @@ function BucketReview({ ageGroup, world }: { ageGroup: AgeGroup; world: WorldId 
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [ageGroup, world]);
+  }, [gradeRow, world]);
 
   const handleVerify = async (id: string) => {
     setActingId(id);
@@ -297,19 +328,22 @@ function BucketReview({ ageGroup, world }: { ageGroup: AgeGroup; world: WorldId 
       setActingId(null);
       return;
     }
-    const reason = await dlg.prompt({
-      title: "Flag for another reviewer",
-      message: "What should they look at? Leave blank if you don't need to say.",
-      placeholder: "Optional note",
-      multiline: true,
-      okLabel: "Flag word",
-    });
-    if (reason === null) return;
+    setFlagTargetId(id);
+  };
+
+  const submitFlag = async (result: FlagDialogResult) => {
+    const id = flagTargetId;
+    if (!id) return;
+    setFlagTargetId(null);
     setActingId(id);
     await fetch(`/api/words/${id}/flag`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ flagged: true, reason: reason || undefined }),
+      body: JSON.stringify({
+        flagged: true,
+        reasons: result.reasons,
+        note: result.note || undefined,
+      }),
     });
     setWords((prev) =>
       prev.map((w) => (w.id === id ? { ...w, flagged: true } : w)),
@@ -334,8 +368,17 @@ function BucketReview({ ageGroup, world }: { ageGroup: AgeGroup; world: WorldId 
           </Link>
           <div className="flex items-center justify-between mt-2 gap-4 flex-wrap">
             <h1 className="text-3xl font-semibold text-[var(--text-primary)] flex items-center gap-3 flex-wrap">
-              <AgeChip ageGroup={ageGroup} />
-              <span>Ages {ageGroup}</span>
+              {gradeRow === "ungraded" ? (
+                <>
+                  <span className="badge badge-warning">⚠ Ungraded</span>
+                  <span>Ungraded</span>
+                </>
+              ) : (
+                <>
+                  <GradeBadge value={gradeRow} />
+                  <span>{GRADE_LEVEL_LABEL[gradeRow]}</span>
+                </>
+              )}
               <span className="text-[var(--text-secondary)]">·</span>
               <span className="flex items-center gap-2">
                 <span>{worldMeta.emoji}</span>
@@ -400,14 +443,14 @@ function BucketReview({ ageGroup, world }: { ageGroup: AgeGroup; world: WorldId 
           </div>
         )}
       </main>
+      {flagTargetId && (
+        <FlagDialog
+          word={words.find((w) => w.id === flagTargetId)?.word ?? "this word"}
+          onSubmit={submitFlag}
+          onCancel={() => setFlagTargetId(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AgeChip({ ageGroup }: { ageGroup: AgeGroup }) {
-  const cls =
-    ageGroup === "4-6" ? "badge-age-46"
-    : ageGroup === "7-9" ? "badge-age-79"
-    : "badge-age-1012";
-  return <span className={`badge ${cls}`}>{ageGroup}</span>;
-}

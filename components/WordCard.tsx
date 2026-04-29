@@ -2,7 +2,8 @@
 
 import type { Word } from "@/lib/types";
 import { worldForCategory } from "@/lib/worlds";
-import AgeBadge from "@/components/AgeBadge";
+import GradeBadge from "@/components/GradeBadge";
+import ImageLightbox from "@/components/ImageLightbox";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -32,17 +33,33 @@ export default function WordCard({
   // yet, the API returns 302 → R2 404. Hide the slot rather than showing a
   // broken-image icon next to the word.
   const [imageFailed, setImageFailed] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const imageSrc = `/api/words/${word.id}/image`;
   return (
     <div className="card p-6 transition-normal">
       {/* Header: word + chips + status — visually sealed with a bottom divider */}
       <div className="review-card-header">
         {!imageFailed && (
-          <img
-            src={`/api/words/${word.id}/image`}
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            aria-label={`View larger illustration for ${word.word}`}
+            className="review-card-image-button"
+          >
+            <img
+              src={imageSrc}
+              alt={`Illustration for ${word.word}`}
+              className="review-card-image"
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+            />
+          </button>
+        )}
+        {lightboxOpen && !imageFailed && (
+          <ImageLightbox
+            src={imageSrc}
             alt={`Illustration for ${word.word}`}
-            className="review-card-image"
-            loading="lazy"
-            onError={() => setImageFailed(true)}
+            onClose={() => setLightboxOpen(false)}
           />
         )}
         <div className="review-card-header__main">
@@ -53,9 +70,9 @@ export default function WordCard({
             {word.word}
           </Link>
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            {/* Audience — distinct color per age bucket */}
-            <AgeBadge value={word.age_group} />
-            {/* Difficulty — neutral grey so age is the only ordinal using color */}
+            {/* Audience — distinct color per grade */}
+            <GradeBadge value={word.grade_level} />
+            {/* Difficulty — neutral grey so grade is the only ordinal using color */}
             <span className="badge badge-meta-level">Level {word.level}</span>
             {/* Destination — accent tint */}
             {assignment.world ? (

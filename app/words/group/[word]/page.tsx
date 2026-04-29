@@ -5,13 +5,15 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
-import type { AgeGroup, Level } from "@/lib/types";
+import type { AgeGroup, GradeLevel, Level } from "@/lib/types";
+import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
 import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 
 type Variant = {
   id: string;
   word: string;
   age_group: AgeGroup;
+  grade_level: GradeLevel | null;
   level: Level;
   category: string;
   hints: { easy?: string; medium?: string; hard?: string } | null;
@@ -68,7 +70,7 @@ export default function GroupedWordPage({
     source: "",
   });
   const [variantEdits, setVariantEdits] = useState<
-    Record<string, { level: Level; hints_easy: string; hints_medium: string; hints_hard: string; age_group: AgeGroup }>
+    Record<string, { level: Level; hints_easy: string; hints_medium: string; hints_hard: string; grade_level: GradeLevel }>
   >({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -114,7 +116,7 @@ export default function GroupedWordPage({
         hints_easy: v.hints?.easy ?? "",
         hints_medium: v.hints?.medium ?? "",
         hints_hard: v.hints?.hard ?? "",
-        age_group: v.age_group,
+        grade_level: (v.grade_level ?? "k") as GradeLevel,
       };
     }
     setVariantEdits(edits);
@@ -180,7 +182,7 @@ export default function GroupedWordPage({
               id: v.id,
               version: v.version,
               level: e.level,
-              age_group: e.age_group,
+              gradeLevel: e.grade_level,
               hints: {
                 easy: e.hints_easy,
                 medium: e.hints_medium,
@@ -291,8 +293,12 @@ export default function GroupedWordPage({
             </h1>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className="text-sm text-[var(--text-secondary)]">
-                {variants.length} age variant{variants.length > 1 ? "s" : ""}:{" "}
-                {variants.map((v) => v.age_group).join(" · ")}
+                {variants.length} grade variant{variants.length > 1 ? "s" : ""}:{" "}
+                {variants
+                  .map((v) =>
+                    v.grade_level ? GRADE_LEVEL_LABEL[v.grade_level] : "ungraded",
+                  )
+                  .join(" · ")}
               </span>
               {currentWorld && (
                 <span
@@ -522,7 +528,7 @@ export default function GroupedWordPage({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-semibold">
-                    Ages {v.age_group}
+                    {v.grade_level ? GRADE_LEVEL_LABEL[v.grade_level] : "Ungraded"}
                     <span className="ml-2 text-sm font-normal text-[var(--text-secondary)]">
                       · Level {v.level}
                     </span>
@@ -569,24 +575,24 @@ export default function GroupedWordPage({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                    Age group
+                    Grade
                   </label>
                   <select
-                    value={edits.age_group}
+                    value={edits.grade_level}
                     onChange={(e) =>
                       setVariantEdits({
                         ...variantEdits,
                         [v.id]: {
                           ...edits,
-                          age_group: e.target.value as AgeGroup,
+                          grade_level: e.target.value as GradeLevel,
                         },
                       })
                     }
                     className="input"
                   >
-                    {(["4-6", "7-9", "10-12"] as AgeGroup[]).map((a) => (
-                      <option key={a} value={a}>
-                        Ages {a}
+                    {GRADE_LEVELS.map((g) => (
+                      <option key={g} value={g}>
+                        {GRADE_LEVEL_LABEL[g]}
                       </option>
                     ))}
                   </select>

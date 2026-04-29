@@ -1,6 +1,7 @@
 "use client";
 
-import type { AgeGroup, Level, WordFilters } from "@/lib/types";
+import type { GradeLevel, Level, WordFilters } from "@/lib/types";
+import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
 import { WORLDS } from "@/lib/worlds";
 
 interface FilterBarProps {
@@ -13,7 +14,6 @@ interface FilterBarProps {
   showFlaggedToggle?: boolean;
 }
 
-const AGE_GROUPS: AgeGroup[] = ["4-6", "7-9", "10-12"];
 const LEVELS: Level[] = [1, 2, 3];
 
 export default function FilterBar({
@@ -25,7 +25,8 @@ export default function FilterBar({
   const hasAny =
     filters.search ||
     filters.world ||
-    filters.ageGroup ||
+    filters.gradeLevel ||
+    filters.ungraded ||
     filters.level ||
     filters.verified !== undefined ||
     filters.flagged !== undefined ||
@@ -65,17 +66,25 @@ export default function FilterBar({
       </select>
 
       <select
-        value={filters.ageGroup || ""}
-        onChange={(e) =>
-          onChange({ ...filters, ageGroup: (e.target.value as AgeGroup) || undefined })
-        }
+        value={filters.ungraded ? "__ungraded__" : (filters.gradeLevel || "")}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === "__ungraded__") {
+            onChange({ ...filters, ungraded: true, gradeLevel: undefined });
+          } else if (v) {
+            onChange({ ...filters, gradeLevel: v as GradeLevel, ungraded: undefined });
+          } else {
+            onChange({ ...filters, gradeLevel: undefined, ungraded: undefined });
+          }
+        }}
         className={selectCls}
-        aria-label="Filter by age group"
+        aria-label="Filter by grade level"
       >
-        <option value="">All ages</option>
-        {AGE_GROUPS.map((a) => (
-          <option key={a} value={a}>Ages {a}</option>
+        <option value="">All grades</option>
+        {GRADE_LEVELS.map((g) => (
+          <option key={g} value={g}>{GRADE_LEVEL_LABEL[g]}</option>
         ))}
+        <option value="__ungraded__">Ungraded</option>
       </select>
 
       <select

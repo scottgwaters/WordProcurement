@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, use } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
-import type { Word, AgeGroup, Level, ActivityLogWithUser } from "@/lib/types";
+import type { Word, AgeGroup, GradeLevel, Level, ActivityLogWithUser } from "@/lib/types";
+import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
@@ -32,6 +33,7 @@ export default function WordDetailPage({
     id: string;
     word: string;
     ageGroup: AgeGroup;
+    gradeLevel: GradeLevel | null;
     level: Level;
     category: string;
     verified: boolean;
@@ -57,6 +59,7 @@ export default function WordDetailPage({
     word: "",
     category: "",
     age_group: "4-6" as AgeGroup,
+    grade_level: "k" as GradeLevel,
     level: 1 as Level,
     hints_easy: "",
     hints_medium: "",
@@ -103,6 +106,7 @@ export default function WordDetailPage({
       word: data.word,
       category: data.category,
       age_group: data.age_group,
+      grade_level: (data.grade_level ?? "k") as GradeLevel,
       level: data.level,
       hints_easy: data.hints?.easy || "",
       hints_medium: data.hints?.medium || "",
@@ -196,15 +200,15 @@ export default function WordDetailPage({
     };
   }, [status, resolvedParams.id]);
 
-  // Load per-world counts for this word's age group so the World dropdown
-  // can show "Animal Kingdom · 47 at 7-9" style hints. Re-fetches when the
-  // age group changes.
+  // Load per-world counts for this word's grade so the World dropdown
+  // can show "Animal Kingdom · 47 at 1st" style hints. Re-fetches when
+  // the grade changes.
   useEffect(() => {
-    if (status !== "authenticated" || !formData.age_group) return;
+    if (status !== "authenticated" || !formData.grade_level) return;
     const controller = new AbortController();
     (async () => {
       const params = new URLSearchParams({
-        ageGroup: formData.age_group,
+        gradeLevel: formData.grade_level,
         byWorld: "1",
       });
       const res = await fetch(`/api/words/stats?${params}`, {
@@ -218,7 +222,7 @@ export default function WordDetailPage({
       // Counts are decorative; silent on errors.
     });
     return () => controller.abort();
-  }, [formData.age_group, status]);
+  }, [formData.grade_level, status]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -229,6 +233,7 @@ export default function WordDetailPage({
       word: formData.word.toUpperCase(),
       category: formData.category,
       age_group: formData.age_group,
+      grade_level: formData.grade_level,
       level: formData.level,
       hints: {
         easy: formData.hints_easy,
@@ -400,7 +405,7 @@ export default function WordDetailPage({
                       {d.word}
                     </Link>
                     <span className="text-[var(--text-secondary)]">
-                      · ages {d.ageGroup} · level {d.level}
+                      · {d.gradeLevel ? GRADE_LEVEL_LABEL[d.gradeLevel] : "ungraded"} · level {d.level}
                       {dWorld ? ` · ${dWorld.emoji} ${dWorld.name}` : ""}
                     </span>
                     {d.verified ? (
@@ -531,7 +536,7 @@ export default function WordDetailPage({
                       const count = worldCounts?.[w.id];
                       const suffix =
                         count !== undefined
-                          ? ` · ${count} at ${formData.age_group}`
+                          ? ` · ${count} at ${GRADE_LEVEL_LABEL[formData.grade_level]}`
                           : "";
                       return (
                         <option
@@ -574,21 +579,23 @@ export default function WordDetailPage({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                    Age Group
+                    Grade
                   </label>
                   <select
-                    value={formData.age_group}
+                    value={formData.grade_level}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        age_group: e.target.value as AgeGroup,
+                        grade_level: e.target.value as GradeLevel,
                       })
                     }
                     className="input"
                   >
-                    <option value="4-6">Ages 4-6</option>
-                    <option value="7-9">Ages 7-9</option>
-                    <option value="10-12">Ages 10-12</option>
+                    {GRADE_LEVELS.map((g) => (
+                      <option key={g} value={g}>
+                        {GRADE_LEVEL_LABEL[g]}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -879,6 +886,9 @@ export default function WordDetailPage({
                               )}
                             </div>
                           )}
+                          {entry.action === "flagged" && entry.details && (
+                            <FlagDetails details={entry.details} />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -890,6 +900,52 @@ export default function WordDetailPage({
 
         </div>
       </main>
+    </div>
+  );
+}
+
+// Renders the details payload of a "flagged" activity_log row. Handles both
+// shapes: new = { reasons: string[], note?: string }, legacy = { reason: string }.
+function FlagDetails({ details }: { details: unknown }) {
+  if (!details || typeof details !== "object") return null;
+  const d = details as {
+    reasons?: unknown;
+    note?: unknown;
+    reason?: unknown;
+  };
+  const REASON_LABELS: Record<string, string> = {
+    image: "Picture",
+    word_details: "Word details",
+  };
+  const reasons = Array.isArray(d.reasons)
+    ? d.reasons.filter((r): r is string => typeof r === "string")
+    : [];
+  const note =
+    typeof d.note === "string" && d.note.trim().length > 0
+      ? d.note.trim()
+      : typeof d.reason === "string" && d.reason.trim().length > 0
+        ? d.reason.trim()
+        : null;
+  if (reasons.length === 0 && !note) return null;
+  return (
+    <div className="mt-2 text-sm bg-[var(--bg-secondary)] rounded p-3 space-y-2">
+      {reasons.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+            Flagged:
+          </span>
+          {reasons.map((r) => (
+            <span key={r} className="badge badge-warning">
+              {REASON_LABELS[r] ?? r}
+            </span>
+          ))}
+        </div>
+      )}
+      {note && (
+        <div className="text-[var(--text-primary)] whitespace-pre-wrap">
+          {note}
+        </div>
+      )}
     </div>
   );
 }

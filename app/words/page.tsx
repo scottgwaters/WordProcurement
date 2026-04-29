@@ -8,7 +8,8 @@ import Link from "next/link";
 import type { Word, WordFilters } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import { worldForCategory } from "@/lib/worlds";
-import AgeBadge from "@/components/AgeBadge";
+import GradeBadge from "@/components/GradeBadge";
+import WordReviewModal from "@/components/WordReviewModal";
 
 // useSearchParams requires a Suspense boundary during prerender;
 // the outer default export provides one.
@@ -32,6 +33,7 @@ function WordsPageInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [modalWord, setModalWord] = useState<Word | null>(null);
   const pageSize = 50;
 
   const router = useRouter();
@@ -46,7 +48,8 @@ function WordsPageInner() {
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
     if (filters.world) params.set("world", filters.world);
-    if (filters.ageGroup) params.set("ageGroup", filters.ageGroup);
+    if (filters.gradeLevel) params.set("gradeLevel", filters.gradeLevel);
+    if (filters.ungraded) params.set("ungraded", "true");
     if (filters.level) params.set("level", String(filters.level));
     if (filters.verified !== undefined) params.set("verified", String(filters.verified));
     if (filters.flagged) params.set("flagged", "true");
@@ -131,7 +134,7 @@ function WordsPageInner() {
                   <tr>
                     <th>Word</th>
                     <th>World</th>
-                    <th>Age Group</th>
+                    <th>Grade</th>
                     <th>Level</th>
                     <th>Status</th>
                     <th></th>
@@ -157,7 +160,7 @@ function WordsPageInner() {
                         )}
                       </td>
                       <td>
-                        <AgeBadge value={word.age_group} />
+                        <GradeBadge value={word.grade_level} />
                       </td>
                       <td>
                         <span className="text-sm">{word.level}</span>

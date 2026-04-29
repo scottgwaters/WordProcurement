@@ -25,9 +25,18 @@ export async function POST(
 
   const body = await request.json().catch(() => ({}));
   const flagged: boolean = body.flagged !== false; // default true
-  const reason: string | undefined = typeof body.reason === "string" && body.reason.length > 0
-    ? body.reason
-    : undefined;
+
+  // New shape: { reasons: string[], note?: string }. Legacy shape: { reason?: string }.
+  const ALLOWED_REASONS = new Set(["image", "word_details"]);
+  const reasons: string[] = Array.isArray(body.reasons)
+    ? body.reasons.filter((r: unknown): r is string => typeof r === "string" && ALLOWED_REASONS.has(r))
+    : [];
+  const note: string | undefined =
+    typeof body.note === "string" && body.note.trim().length > 0
+      ? body.note.trim()
+      : typeof body.reason === "string" && body.reason.trim().length > 0
+        ? body.reason.trim()
+        : undefined;
 
   // Ensure the word exists before logging
   const word = await prisma.word.findUnique({ where: { id: resolvedParams.id } });
@@ -35,12 +44,17 @@ export async function POST(
     return NextResponse.json({ error: "Word not found" }, { status: 404 });
   }
 
+  const details =
+    flagged && (reasons.length > 0 || note)
+      ? { reasons, ...(note ? { note } : {}) }
+      : undefined;
+
   await prisma.activityLog.create({
     data: {
       wordId: resolvedParams.id,
       userId: session.user.id,
       action: flagged ? "flagged" : "unflagged",
-      details: reason ? { reason } : undefined,
+      details,
     },
   });
 

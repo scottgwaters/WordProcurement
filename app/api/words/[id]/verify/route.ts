@@ -50,6 +50,7 @@ export async function POST(
     id: updatedWord.id,
     word: updatedWord.word,
     age_group: updatedWord.ageGroup,
+    grade_level: updatedWord.gradeLevel,
     level: updatedWord.level,
     category: updatedWord.category,
     word_length: updatedWord.wordLength,

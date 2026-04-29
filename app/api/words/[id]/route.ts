@@ -28,6 +28,7 @@ export async function GET(
     id: word.id,
     word: word.word,
     age_group: word.ageGroup,
+    grade_level: word.gradeLevel,
     level: word.level,
     category: word.category,
     word_length: word.wordLength,
@@ -92,6 +93,7 @@ export async function PATCH(
     word,
     category,
     age_group,
+    grade_level,
     level,
     hints,
     definition,
@@ -121,6 +123,7 @@ export async function PATCH(
           id: existingWord.id,
           word: existingWord.word,
           age_group: existingWord.ageGroup,
+          grade_level: existingWord.gradeLevel,
           level: existingWord.level,
           category: existingWord.category,
           hints: existingWord.hints,
@@ -162,6 +165,13 @@ export async function PATCH(
       changes.age_group = { old: existingWord.ageGroup, new: age_group };
     }
     updateData.ageGroup = age_group;
+  }
+  if (grade_level !== undefined) {
+    const newGrade = grade_level ?? null;
+    if (newGrade !== existingWord.gradeLevel) {
+      changes.grade_level = { old: existingWord.gradeLevel, new: newGrade };
+    }
+    updateData.gradeLevel = newGrade;
   }
   if (level !== undefined) {
     if (level !== existingWord.level) {

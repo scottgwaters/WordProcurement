@@ -1,7 +1,19 @@
 // Word data types for Word Procurement
 
 export type AgeGroup = "4-6" | "7-9" | "10-12";
+export type GradeLevel = "prek" | "k" | "1" | "2" | "3" | "4";
 export type Level = 1 | 2 | 3;
+
+export const GRADE_LEVELS: GradeLevel[] = ["prek", "k", "1", "2", "3", "4"];
+
+export const GRADE_LEVEL_LABEL: Record<GradeLevel, string> = {
+  prek: "Pre-K",
+  k: "K",
+  "1": "1st",
+  "2": "2nd",
+  "3": "3rd",
+  "4": "4th",
+};
 
 export interface Hints {
   easy: string;
@@ -13,6 +25,7 @@ export interface Word {
   id: string;
   word: string;
   age_group: AgeGroup;
+  grade_level: GradeLevel | null;
   level: Level;
   category: string;
   word_length: number;
@@ -45,7 +58,7 @@ export interface ActivityLog {
   id: string;
   word_id: string;
   user_id: string;
-  action: "created" | "verified" | "rejected" | "edited";
+  action: "created" | "verified" | "rejected" | "edited" | "flagged" | "unflagged";
   details: Record<string, unknown> | null;
   created_at: string;
 }
@@ -77,6 +90,10 @@ export interface User {
 // via intersection where needed (see /words, /review).
 export interface WordFilters {
   ageGroup?: AgeGroup;
+  gradeLevel?: GradeLevel;
+  /** Match words whose grade_level is null (ungraded). Mutually exclusive
+   *  with `gradeLevel` in the UI. */
+  ungraded?: boolean;
   level?: Level;
   verified?: boolean;
   /** True when the "Flagged" status option is selected. Flag state is

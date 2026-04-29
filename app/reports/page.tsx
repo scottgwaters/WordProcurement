@@ -4,9 +4,10 @@ import Header from "@/components/Header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
-import type { AgeGroup, Level } from "@/lib/types";
+import type { GradeLevel, Level } from "@/lib/types";
+import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
+import GradeBadge from "@/components/GradeBadge";
 
-const AGE_GROUPS: AgeGroup[] = ["4-6", "7-9", "10-12"];
 const LEVELS: Level[] = [1, 2, 3];
 const WORLD_ORDER: WorldId[] = [
   "animals", "food", "nature", "space", "objects", "magic", "sight", "feelings",
@@ -21,6 +22,12 @@ const WORLD_BY_CATEGORY: Record<string, WorldId> = {};
 });
 
 type Counts = { total: number; verified: number };
+
+// Rows include the six grades plus an "ungraded" bucket so reviewers can
+// see what hasn't been graded yet. Once the corpus is fully graded the
+// ungraded row has a zero total and is hidden in the render.
+type GradeRow = GradeLevel | "ungraded";
+const GRADE_ROWS: GradeRow[] = [...GRADE_LEVELS, "ungraded"];
 
 function emptyWorldMatrix(): Record<WorldId, Record<Level, Counts>> {
   const out = {} as Record<WorldId, Record<Level, Counts>>;
@@ -38,50 +45,54 @@ export default async function ReportsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  // One groupBy over (category, ageGroup, level) gives us every cell of every
-  // age group's matrix in a single round-trip. Categories are folded into
-  // worlds client-side using CATEGORIES_BY_WORLD so the UI stays in sync with
-  // the game's mapping (the source of truth lives in lib/worlds.ts).
+  // One groupBy over (category, gradeLevel, level) gives us every cell of
+  // every grade's matrix in a single round-trip. Categories are folded into
+  // worlds client-side using CATEGORIES_BY_WORLD so the UI stays in sync
+  // with the game's mapping (the source of truth lives in lib/worlds.ts).
   const [allCells, verifiedCells] = await Promise.all([
     prisma.word.groupBy({
-      by: ["category", "ageGroup", "level"],
+      by: ["category", "gradeLevel", "level"],
       _count: { _all: true },
       where: { declined: false },
     }),
     prisma.word.groupBy({
-      by: ["category", "ageGroup", "level"],
+      by: ["category", "gradeLevel", "level"],
       _count: { _all: true },
       where: { declined: false, verified: true },
     }),
   ]);
 
-  const byAge: Record<AgeGroup, Record<WorldId, Record<Level, Counts>>> = {
-    "4-6":   emptyWorldMatrix(),
-    "7-9":   emptyWorldMatrix(),
-    "10-12": emptyWorldMatrix(),
+  const byGrade: Record<GradeRow, Record<WorldId, Record<Level, Counts>>> = {
+    prek: emptyWorldMatrix(),
+    k: emptyWorldMatrix(),
+    "1": emptyWorldMatrix(),
+    "2": emptyWorldMatrix(),
+    "3": emptyWorldMatrix(),
+    "4": emptyWorldMatrix(),
+    ungraded: emptyWorldMatrix(),
   };
 
   const accumulate = (rows: typeof allCells, key: keyof Counts) => {
     rows.forEach((row) => {
       const worldId = WORLD_BY_CATEGORY[row.category];
       if (!worldId) return; // unknown category — surfaces in dashboard only
-      const ag = row.ageGroup as AgeGroup;
+      const g = (row.gradeLevel ?? "ungraded") as GradeRow;
       const lvl = row.level as Level;
-      if (!byAge[ag]?.[worldId]?.[lvl]) return;
-      byAge[ag][worldId][lvl][key] += row._count._all;
+      if (!byGrade[g]?.[worldId]?.[lvl]) return;
+      byGrade[g][worldId][lvl][key] += row._count._all;
     });
   };
   accumulate(allCells, "total");
   accumulate(verifiedCells, "verified");
 
-  const ageTotals: Record<AgeGroup, Counts> = {} as Record<AgeGroup, Counts>;
-  AGE_GROUPS.forEach((ag) => {
+  const gradeTotals: Record<GradeRow, Counts> = {} as Record<GradeRow, Counts>;
+  GRADE_ROWS.forEach((g) => {
     let total = 0, verified = 0;
     WORLD_ORDER.forEach((w) => LEVELS.forEach((l) => {
-      total += byAge[ag][w][l].total;
-      verified += byAge[ag][w][l].verified;
+      total += byGrade[g][w][l].total;
+      verified += byGrade[g][w][l].verified;
     }));
-    ageTotals[ag] = { total, verified };
+    gradeTotals[g] = { total, verified };
   });
 
   return (
@@ -90,35 +101,49 @@ export default async function ReportsPage() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-[var(--text-primary)]">
-            Words by Age Group & World
+            Words by Grade & World
           </h1>
           <p className="text-[var(--text-secondary)] mt-1">
-            For each age group, word counts broken out by world and difficulty
+            For each grade, word counts broken out by world and difficulty
             level. Each cell shows total / verified and links to the filtered
             word list.
           </p>
         </div>
 
         <div className="space-y-8">
-          {AGE_GROUPS.map((ag) => {
-            const matrix = byAge[ag];
-            const totals = ageTotals[ag];
-            // Sort worlds by count within this age group so the heaviest
+          {GRADE_ROWS.map((g) => {
+            const matrix = byGrade[g];
+            const totals = gradeTotals[g];
+            // Hide the ungraded row entirely once it's empty — once the
+            // corpus is fully graded reviewers don't need a row of dashes.
+            if (g === "ungraded" && totals.total === 0) return null;
+            // Sort worlds by count within this grade so the heaviest
             // buckets sit on top of each table — easier to scan progress.
             const sortedWorlds = [...WORLD_ORDER].sort((a, b) => {
               const aSum = LEVELS.reduce((s, l) => s + matrix[a][l].total, 0);
               const bSum = LEVELS.reduce((s, l) => s + matrix[b][l].total, 0);
               return bSum - aSum;
             });
+            const headerHref =
+              g === "ungraded" ? `/words?ungraded=true` : `/words?gradeLevel=${g}`;
             return (
-              <section key={ag} className="card p-6">
+              <section key={g} className="card p-6">
                 <div className="flex items-baseline justify-between mb-4">
                   <h2 className="text-lg font-semibold flex items-center gap-3">
-                    <AgeChip ageGroup={ag} />
-                    <span>Ages {ag}</span>
+                    {g === "ungraded" ? (
+                      <>
+                        <span className="badge badge-warning">⚠ Ungraded</span>
+                        <span>Ungraded</span>
+                      </>
+                    ) : (
+                      <>
+                        <GradeBadge value={g} />
+                        <span>{GRADE_LEVEL_LABEL[g]}</span>
+                      </>
+                    )}
                   </h2>
                   <Link
-                    href={`/words?ageGroup=${ag}`}
+                    href={headerHref}
                     className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {totals.total.toLocaleString()} words
@@ -150,6 +175,8 @@ export default async function ReportsPage() {
                         const rowVerified = LEVELS.reduce(
                           (s, l) => s + matrix[worldId][l].verified, 0,
                         );
+                        const cellGrade =
+                          g === "ungraded" ? "ungraded=true" : `gradeLevel=${g}`;
                         return (
                           <tr key={worldId}>
                             <td>
@@ -164,7 +191,7 @@ export default async function ReportsPage() {
                                 <td key={lvl} className="text-right">
                                   <ReportCell
                                     counts={c}
-                                    href={`/words?world=${worldId}&ageGroup=${ag}&level=${lvl}`}
+                                    href={`/words?world=${worldId}&${cellGrade}&level=${lvl}`}
                                   />
                                 </td>
                               );
@@ -172,7 +199,7 @@ export default async function ReportsPage() {
                             <td className="text-right">
                               <ReportCell
                                 counts={{ total: rowTotal, verified: rowVerified }}
-                                href={`/words?world=${worldId}&ageGroup=${ag}`}
+                                href={`/words?world=${worldId}&${cellGrade}`}
                                 strong
                               />
                             </td>
@@ -188,11 +215,13 @@ export default async function ReportsPage() {
                           const colVerified = WORLD_ORDER.reduce(
                             (s, w) => s + matrix[w][lvl].verified, 0,
                           );
+                          const cellGrade =
+                            g === "ungraded" ? "ungraded=true" : `gradeLevel=${g}`;
                           return (
                             <td key={lvl} className="text-right">
                               <ReportCell
                                 counts={{ total: colTotal, verified: colVerified }}
-                                href={`/words?ageGroup=${ag}&level=${lvl}`}
+                                href={`/words?${cellGrade}&level=${lvl}`}
                                 strong
                               />
                             </td>
@@ -201,7 +230,7 @@ export default async function ReportsPage() {
                         <td className="text-right">
                           <ReportCell
                             counts={totals}
-                            href={`/words?ageGroup=${ag}`}
+                            href={headerHref}
                             strong
                           />
                         </td>
@@ -243,12 +272,4 @@ function ReportCell({
       </span>
     </Link>
   );
-}
-
-function AgeChip({ ageGroup }: { ageGroup: AgeGroup }) {
-  const cls =
-    ageGroup === "4-6" ? "badge-age-46"
-    : ageGroup === "7-9" ? "badge-age-79"
-    : "badge-age-1012";
-  return <span className={`badge ${cls}`}>{ageGroup}</span>;
 }

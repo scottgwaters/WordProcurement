@@ -20,8 +20,10 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const ageGroup = searchParams.get("ageGroup") || undefined;
+  const gradeLevel = searchParams.get("gradeLevel") || undefined;
   const byWorld = searchParams.get("byWorld") === "1";
   const byWorldAndAge = searchParams.get("byWorldAndAge") === "1";
+  const byWorldAndGrade = searchParams.get("byWorldAndGrade") === "1";
   const wantToday = searchParams.get("today") === "1";
 
   // Exclude declined words from every count — they're soft-deleted, so
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
       where: {
         declined: false,
         ...(ageGroup ? { ageGroup } : {}),
+        ...(gradeLevel ? { gradeLevel } : {}),
       },
     }),
   ]);
@@ -103,6 +106,43 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // {gradeLevel × world} pending matrix — same idea as byWorldAndAge but
+  // bucketed by the new grade axis. Ungraded words (gradeLevel = null)
+  // collapse into an "ungraded" row so reviewers can see what still needs
+  // a grade tag in addition to verification.
+  let pendingByWorldAndGrade:
+    | Record<string, Record<WorldId, number>>
+    | undefined;
+  if (byWorldAndGrade) {
+    const pendingCells = await prisma.word.groupBy({
+      by: ["category", "gradeLevel"],
+      _count: { _all: true },
+      where: { declined: false, verified: false },
+    });
+    const empty = (): Record<WorldId, number> => ({
+      animals: 0, food: 0, nature: 0, space: 0,
+      objects: 0, magic: 0, sight: 0, feelings: 0,
+    });
+    pendingByWorldAndGrade = {
+      prek: empty(), k: empty(), "1": empty(),
+      "2": empty(), "3": empty(), "4": empty(),
+      ungraded: empty(),
+    };
+    const worldByCategory: Record<string, WorldId> = {};
+    (Object.keys(CATEGORIES_BY_WORLD) as WorldId[]).forEach((wid) => {
+      CATEGORIES_BY_WORLD[wid].forEach((cat) => {
+        worldByCategory[cat] = wid;
+      });
+    });
+    pendingCells.forEach((row) => {
+      const wid = worldByCategory[row.category];
+      if (!wid) return;
+      const key = row.gradeLevel ?? "ungraded";
+      if (!pendingByWorldAndGrade![key]) return;
+      pendingByWorldAndGrade![key][wid] += row._count._all;
+    });
+  }
+
   // "Today" = server local-day boundary. Good enough for a progress signal;
   // we're not trying to match any specific user's timezone.
   let verifiedToday: number | undefined;
@@ -122,6 +162,7 @@ export async function GET(request: NextRequest) {
     categoryCounts,
     ...(countsByWorld ? { countsByWorld } : {}),
     ...(pendingByWorldAndAge ? { pendingByWorldAndAge } : {}),
+    ...(pendingByWorldAndGrade ? { pendingByWorldAndGrade } : {}),
     ...(verifiedToday !== undefined ? { verifiedToday } : {}),
   });
 }

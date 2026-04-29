@@ -37,7 +37,7 @@ export async function GET(
 
   const variants = await prisma.word.findMany({
     where: { word },
-    orderBy: [{ ageGroup: "asc" }, { level: "asc" }],
+    orderBy: [{ gradeLevel: "asc" }, { level: "asc" }],
   });
 
   if (variants.length === 0) {
@@ -107,6 +107,7 @@ export async function PATCH(
     level?: number;
     hints?: Prisma.InputJsonValue;
     ageGroup?: string;
+    gradeLevel?: string | null;
   }> = Array.isArray(body.variants) ? body.variants : [];
 
   for (const v of variantInputs) {
@@ -140,6 +141,7 @@ export async function PATCH(
       if (v.level !== undefined) data.level = v.level;
       if (v.hints !== undefined) data.hints = v.hints;
       if (v.ageGroup !== undefined) data.ageGroup = v.ageGroup;
+      if (v.gradeLevel !== undefined) data.gradeLevel = v.gradeLevel;
       // Only include the update if there's actually something to change
       // beyond the bump. The shared fan-out already covers shared fields.
       const hasVariantChange = Object.keys(data).length > 1;
@@ -212,7 +214,7 @@ export async function PATCH(
 
   const fresh = await prisma.word.findMany({
     where: { word },
-    orderBy: [{ ageGroup: "asc" }, { level: "asc" }],
+    orderBy: [{ gradeLevel: "asc" }, { level: "asc" }],
   });
   return NextResponse.json({ word, variants: fresh.map(transform) });
 }
@@ -221,6 +223,7 @@ function transform(w: {
   id: string;
   word: string;
   ageGroup: string;
+  gradeLevel: string | null;
   level: number;
   category: string;
   wordLength: number;
@@ -244,6 +247,7 @@ function transform(w: {
     id: w.id,
     word: w.word,
     age_group: w.ageGroup,
+    grade_level: w.gradeLevel,
     level: w.level,
     category: w.category,
     word_length: w.wordLength,
