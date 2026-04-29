@@ -42,6 +42,10 @@ model Word {
   id                   String    @id @default(cuid())
   word                 String
   ageGroup             String    @map("age_group")
+  // Nullable during the age-group → grade-level migration. Words without a
+  // grade tag are treated as "ungraded" by the iOS filter and excluded from
+  // grade-scoped pools until a curation batch assigns them.
+  gradeLevel           String?   @map("grade_level")
   level                Int
   category             String
   wordLength           Int       @map("word_length")
@@ -78,6 +82,7 @@ model Word {
 
   @@index([category])
   @@index([ageGroup])
+  @@index([gradeLevel])
   @@index([verified])
   @@map("words")
 }

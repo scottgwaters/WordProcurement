@@ -7,6 +7,7 @@ interface WordEntry {
   id: string;
   word: string;
   age_group: string;
+  grade_level?: string;
   level: number;
   category: string;
   word_length: number;
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
                 id: w.id,
                 word: w.word.toUpperCase(),
                 ageGroup: w.age_group,
+                gradeLevel: w.grade_level ?? null,
                 level: w.level,
                 category: w.category,
                 wordLength: w.word_length,
@@ -89,6 +91,7 @@ export async function POST(request: NextRequest) {
               update: {
                 word: w.word.toUpperCase(),
                 ageGroup: w.age_group,
+                ...(w.grade_level !== undefined && { gradeLevel: w.grade_level }),
                 level: w.level,
                 category: w.category,
                 wordLength: w.word_length,
