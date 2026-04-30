@@ -311,6 +311,9 @@ function BucketReview({
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
   const [flagTargetId, setFlagTargetId] = useState<string | null>(null);
+  // Default ON — once a reviewer verifies a word they usually want it gone
+  // from the queue so they can power through the remaining pending pile.
+  const [hideVerified, setHideVerified] = useState(true);
 
   const worldMeta = WORLDS[world];
 
@@ -416,12 +419,15 @@ function BucketReview({
   const pendingCount = words.filter((w) => !w.verified && !w.declined).length;
   const verifiedCount = words.filter((w) => w.verified).length;
   const declinedCount = words.filter((w) => w.declined).length;
+  const visibleWords = hideVerified
+    ? words.filter((w) => !w.verified)
+    : words;
 
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <div className="mb-6">
+      <div className="bucket-review-header">
+        <div className="max-w-4xl mx-auto px-6 py-4">
           <Link
             href="/review"
             className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -429,21 +435,15 @@ function BucketReview({
             ← Change bucket
           </Link>
           <div className="flex items-center justify-between mt-2 gap-4 flex-wrap">
-            <h1 className="text-3xl font-semibold text-[var(--text-primary)] flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-semibold text-[var(--text-primary)] flex items-center gap-3 flex-wrap">
               {gradeRow === "ungraded" ? (
-                <>
-                  <span className="badge badge-warning">⚠ Ungraded</span>
-                  <span>Ungraded</span>
-                </>
+                <span className="badge badge-warning">⚠ Ungraded</span>
               ) : (
-                <>
-                  <GradeBadge value={gradeRow} size="md" />
-                  <span>{GRADE_LEVEL_LABEL[gradeRow]}</span>
-                </>
+                <GradeBadge value={gradeRow} size="md" />
               )}
-              <span className="text-[var(--text-secondary)]">·</span>
+              <span className="text-[var(--text-tertiary)]">·</span>
               <span className="flex items-center gap-2">
-                <span>{worldMeta.emoji}</span>
+                <span aria-hidden="true">{worldMeta.emoji}</span>
                 <span>{worldMeta.name}</span>
               </span>
             </h1>
@@ -454,12 +454,21 @@ function BucketReview({
                 </div>
                 <div className="text-xs text-[var(--text-secondary)]">Pending</div>
               </div>
-              <div>
-                <div className="text-2xl font-semibold text-[var(--success)]">
+              <button
+                type="button"
+                onClick={() => setHideVerified((v) => !v)}
+                className="hide-verified-btn"
+                aria-pressed={hideVerified}
+                title={hideVerified ? "Show verified words in the list" : "Hide verified words from the list"}
+              >
+                <span className="text-2xl font-semibold text-[var(--success)]">
                   {verifiedCount}
-                </div>
-                <div className="text-xs text-[var(--text-secondary)]">Verified</div>
-              </div>
+                </span>
+                <span className="text-xs text-[var(--text-secondary)] flex items-center gap-1">
+                  Verified
+                  <span aria-hidden="true">{hideVerified ? "🙈" : "👁"}</span>
+                </span>
+              </button>
               {declinedCount > 0 && (
                 <div>
                   <div className="text-2xl font-semibold text-[var(--error)]">
@@ -471,18 +480,22 @@ function BucketReview({
             </div>
           </div>
         </div>
+      </div>
+      <main className="max-w-4xl mx-auto px-6 py-8">
 
         {loading ? (
           <div className="card p-12 text-center">
             <div className="spinner mx-auto mb-4" />
             <p className="text-[var(--text-secondary)]">Loading words...</p>
           </div>
-        ) : words.length === 0 ? (
+        ) : visibleWords.length === 0 ? (
           <div className="card p-12 text-center">
             <div className="text-4xl mb-4">🎉</div>
             <h2 className="text-xl font-semibold mb-2">All caught up!</h2>
             <p className="text-[var(--text-secondary)]">
-              No words pending review in this bucket.
+              {hideVerified && verifiedCount > 0
+                ? `${verifiedCount} verified ${verifiedCount === 1 ? "word is" : "words are"} hidden — toggle "Verified" to show them.`
+                : "No words pending review in this bucket."}
             </p>
             <Link href="/review" className="btn btn-secondary mt-6 inline-flex">
               Pick another bucket
@@ -490,7 +503,7 @@ function BucketReview({
           </div>
         ) : (
           <div className="space-y-6">
-            {words.map((w) => (
+            {visibleWords.map((w) => (
               <WordCard
                 key={w.id}
                 word={w}
