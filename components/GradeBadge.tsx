@@ -1,18 +1,25 @@
+import Image from "next/image";
 import type { GradeLevel } from "@/lib/types";
 
 const GRADE_PRESETS: Record<
   GradeLevel,
-  { emoji: string; label: string; className: string }
+  { icon: string; label: string; className: string }
 > = {
-  prek: { emoji: "🍼", label: "Pre-K", className: "badge-grade-prek" },
-  k:    { emoji: "🐣", label: "K",     className: "badge-grade-k" },
-  "1":  { emoji: "1️⃣", label: "1st",  className: "badge-grade-1" },
-  "2":  { emoji: "2️⃣", label: "2nd",  className: "badge-grade-2" },
-  "3":  { emoji: "3️⃣", label: "3rd",  className: "badge-grade-3" },
-  "4":  { emoji: "4️⃣", label: "4th",  className: "badge-grade-4" },
+  prek: { icon: "/grade-icons/chick.png", label: "Pre-K", className: "grade-pill--prek" },
+  k:    { icon: "/grade-icons/bunny.png", label: "K",     className: "grade-pill--k" },
+  "1":  { icon: "/grade-icons/fox.png",   label: "1st",   className: "grade-pill--1" },
+  "2":  { icon: "/grade-icons/deer.png",  label: "2nd",   className: "grade-pill--2" },
+  "3":  { icon: "/grade-icons/owl.png",   label: "3rd",   className: "grade-pill--3" },
+  "4":  { icon: "/grade-icons/bear.png",  label: "4th",   className: "grade-pill--4" },
 };
 
-export default function GradeBadge({ value }: { value: GradeLevel | null | undefined }) {
+export default function GradeBadge({
+  value,
+  size = "sm",
+}: {
+  value: GradeLevel | null | undefined;
+  size?: "sm" | "md";
+}) {
   if (!value) {
     return (
       <span className="badge badge-warning" title="No grade level assigned yet">
@@ -28,9 +35,18 @@ export default function GradeBadge({ value }: { value: GradeLevel | null | undef
       </span>
     );
   }
+  const dim = size === "md" ? 28 : 22;
   return (
-    <span className={`badge ${preset.className}`}>
-      <span aria-hidden="true">{preset.emoji}</span> {preset.label}
+    <span className={`grade-pill grade-pill--${size} ${preset.className}`}>
+      <Image
+        src={preset.icon}
+        alt=""
+        width={dim}
+        height={dim}
+        className="grade-pill__icon"
+        aria-hidden="true"
+      />
+      <span className="grade-pill__label">{preset.label}</span>
     </span>
   );
 }

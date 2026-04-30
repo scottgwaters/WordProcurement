@@ -628,3 +628,291 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   color: #0f172a;
   flex: 1 1 auto;
 }
+
+/* ===== Grade pills (with PNG icons) =================================== */
+
+.grade-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.grade-pill--sm {
+  font-size: 0.8125rem;
+  min-height: 28px;
+  min-width: 76px;
+}
+
+.grade-pill--md {
+  font-size: 0.9375rem;
+  min-height: 38px;
+  min-width: 96px;
+  padding: 4px 14px 4px 4px;
+}
+
+.grade-pill__icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.grade-pill--md .grade-pill__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.grade-pill__label {
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+/* Per-grade color rings — pill background tints lightly match the icon's
+   color identity so the row heading reads as a unit even at a glance. */
+.grade-pill--prek { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.grade-pill--k    { background: #fde2dc; color: #9a3a2a; border-color: #f5b9ad; }
+.grade-pill--1    { background: #ffe7d3; color: #9a4a1f; border-color: #fbb98a; }
+.grade-pill--2    { background: #d6f0e2; color: #1f6b4a; border-color: #8fd4b1; }
+.grade-pill--3    { background: #cfeeec; color: #1a5e60; border-color: #7fcdc9; }
+.grade-pill--4    { background: #dbe4f5; color: #2e3f7a; border-color: #a4b4dc; }
+
+/* ===== Bucket picker table =========================================== */
+
+.bucket-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+  overflow: hidden;
+}
+
+.bucket-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+}
+
+.bucket-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Column headers — stacked icon over label, two-line max */
+.bucket-th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-primary);
+  padding: 18px 12px 16px;
+  font-size: 0.78125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+  vertical-align: bottom;
+}
+
+.bucket-th--grade {
+  text-align: left;
+  padding-left: 20px;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--bg-primary);
+  min-width: 132px;
+}
+
+.bucket-th--world {
+  text-align: center;
+  min-width: 132px;
+}
+
+.bucket-th--total {
+  text-align: center;
+  background: var(--bg-tertiary);
+  min-width: 92px;
+  border-left: 1px solid var(--border-light);
+}
+
+.bucket-th__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bucket-th__icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.bucket-th__label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 14ch;
+  text-align: center;
+  line-height: 1.25;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+}
+
+/* Row head — sticky on horizontal scroll so reviewers always see the grade */
+.bucket-row-head {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-primary);
+  text-align: left;
+  padding: 14px 16px 14px 20px;
+  border-bottom: 1px solid var(--border-light);
+  font-weight: 500;
+  vertical-align: middle;
+  min-width: 132px;
+}
+
+.bucket-row-head--total {
+  background: var(--bg-tertiary);
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8125rem;
+  border-top: 2px solid var(--border);
+}
+
+/* Data cells */
+.bucket-td {
+  padding: 0;
+  text-align: center;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+
+.bucket-td--total-col {
+  background: var(--bg-tertiary);
+  border-left: 1px solid var(--border-light);
+}
+
+.bucket-totals-row .bucket-td {
+  background: var(--bg-tertiary);
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+}
+
+.bucket-td--grand {
+  background: color-mix(in srgb, var(--accent-soft) 35%, var(--bg-tertiary));
+  border-left: 1px solid var(--border-light);
+}
+
+/* Zebra row tint — every other data row gets a subtle warm wash */
+.bucket-table tbody tr:nth-child(even) > .bucket-td:not(.bucket-td--total-col):not(.bucket-td--total-row),
+.bucket-table tbody tr:nth-child(even) > .bucket-row-head:not(.bucket-row-head--total) {
+  background: #fafbfa;
+}
+
+/* Cell content — link or label */
+.bucket-cell-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  padding: 10px 8px;
+  text-decoration: none;
+  color: var(--text-primary);
+  border-radius: 8px;
+  margin: 4px;
+  transition:
+    background-color 120ms var(--ease),
+    box-shadow 120ms var(--ease),
+    transform 120ms var(--ease),
+    border-color 120ms var(--ease);
+  border: 1px solid transparent;
+}
+
+.bucket-cell-wrap--static {
+  cursor: default;
+}
+
+.bucket-cell-wrap:not(.bucket-cell-wrap--static):hover {
+  background: var(--bg-primary);
+  border-color: var(--accent-soft);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.bucket-cell-wrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bucket-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  /* Heat-map tint — opacity scales with --heat (0..1). Uses ocean-teal so
+     dense buckets read warm-cool against the slate header chrome. */
+  background: color-mix(
+    in srgb,
+    var(--approve) calc(var(--heat, 0) * 22%),
+    transparent
+  );
+}
+
+.bucket-cell[data-heat="on"] {
+  border: 1px solid color-mix(
+    in srgb,
+    var(--approve) calc(var(--heat, 0) * 35%),
+    transparent
+  );
+}
+
+.bucket-cell__num {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.bucket-cell--strong .bucket-cell__num {
+  font-weight: 800;
+  color: var(--accent-active);
+}
+
+.bucket-cell--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  width: 100%;
+  color: var(--text-tertiary);
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+/* Last row — drop the bottom border */
+.bucket-table tbody tr:last-child .bucket-td,
+.bucket-table tbody tr:last-child .bucket-row-head {
+  border-bottom: none;
+}
+
