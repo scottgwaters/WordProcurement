@@ -320,7 +320,9 @@ function BucketReview({
   useEffect(() => {
     let cancelled = false;
     const params = new URLSearchParams();
-    params.set("verified", "false");
+    // Load the whole bucket — pending AND historically verified — so the
+    // "Verified" toggle in the header can reveal them. Hidden by default
+    // (hideVerified = true) so reviewers see the pending pile first.
     params.set("world", world);
     if (gradeRow === "ungraded") {
       params.set("ungraded", "true");
