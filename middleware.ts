@@ -10,6 +10,10 @@ export default auth((req) => {
   const isSetupApi = pathname === "/api/setup";
   const isImportApi = pathname === "/api/import";
   const isStorageTestApi = pathname === "/api/storage/test";
+  // Decline endpoint accepts the same bearer for batch cleanup runs
+  // (duplicate sweeps, etc.) — auth is enforced in-handler too.
+  const isDeclineApi =
+    /^\/api\/words\/[^/]+\/decline$/.test(pathname);
   // Invite links are emailed to recipients who do not yet have accounts,
   // so the token page and its validation/accept APIs must be reachable
   // without a session.
@@ -25,7 +29,7 @@ export default auth((req) => {
   // token (defense-in-depth alongside route handler check). The storage-test
   // endpoint is a developer diagnostic that needs to be curl-able from
   // outside a browser session.
-  if (isImportApi || isStorageTestApi) {
+  if (isImportApi || isStorageTestApi || isDeclineApi) {
     const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     const expected = process.env.IMPORT_API_TOKEN;
     if (bearer && expected && bearer === expected) {
