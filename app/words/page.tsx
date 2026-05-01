@@ -146,9 +146,13 @@ function WordsPageInner() {
                     return (
                     <tr key={word.id}>
                       <td>
-                        <span className="font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                        <button
+                          type="button"
+                          onClick={() => setModalWord(word)}
+                          className="font-semibold text-[var(--text-primary)] uppercase tracking-wide hover:text-[var(--accent)] transition-fast cursor-pointer"
+                        >
                           {word.word}
-                        </span>
+                        </button>
                       </td>
                       <td>
                         {world ? (
@@ -231,6 +235,16 @@ function WordsPageInner() {
           )}
         </div>
       </main>
+      {modalWord && (
+        <WordReviewModal
+          word={modalWord}
+          onClose={() => setModalWord(null)}
+          onWordChange={(updated) => {
+            setWords((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+            setModalWord(updated);
+          }}
+        />
+      )}
     </div>
   );
 }
