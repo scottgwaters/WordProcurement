@@ -375,7 +375,15 @@ function BucketReview({
     setActingId(null);
   };
 
-  const handleEdit = (id: string) => router.push(`/words/${id}?from=review`);
+  const handleEdit = (id: string) => {
+    const params = new URLSearchParams({ from: "review", world });
+    if (gradeRow === "ungraded") {
+      params.set("ungraded", "true");
+    } else {
+      params.set("gradeLevel", gradeRow);
+    }
+    router.push(`/words/${id}?${params.toString()}`);
+  };
 
   const handleFlag = async (id: string) => {
     const word = words.find((w) => w.id === id);

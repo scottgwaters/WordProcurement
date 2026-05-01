@@ -17,7 +17,20 @@ export default function WordDetailPage({
   const resolvedParams = use(params);
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
-  const backHref = from === "review" ? "/review" : "/words";
+  // Preserve the bucket the reviewer was in (gradeLevel/ungraded + world) so
+  // "Back to review" lands on the exact same list, not the bucket picker.
+  const backHref = (() => {
+    if (from !== "review") return "/words";
+    const back = new URLSearchParams();
+    const world = searchParams.get("world");
+    const gradeLevel = searchParams.get("gradeLevel");
+    const ungraded = searchParams.get("ungraded");
+    if (world) back.set("world", world);
+    if (gradeLevel) back.set("gradeLevel", gradeLevel);
+    if (ungraded) back.set("ungraded", ungraded);
+    const qs = back.toString();
+    return qs ? `/review?${qs}` : "/review";
+  })();
   const backLabel = from === "review" ? "Back to review" : "Back to words";
   const [word, setWord] = useState<Word | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,10 +52,6 @@ export default function WordDetailPage({
     verified: boolean;
   };
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
-  // Per-world word counts for the current age group, shown inline on each
-  // option in the World dropdown so the curator can see how full each
-  // world is before (re)assigning.
-  const [worldCounts, setWorldCounts] = useState<Record<WorldId, number> | null>(null);
   // Soft-lock state: if someone else is already editing this word, we
   // show a read-only banner and disable the form rather than let two
   // reviewers stomp on each other.
@@ -199,30 +208,6 @@ export default function WordDetailPage({
       fetch(`/api/words/${wordId}/lease`, { method: "DELETE" }).catch(() => {});
     };
   }, [status, resolvedParams.id]);
-
-  // Load per-world counts for this word's grade so the World dropdown
-  // can show "Animal Kingdom · 47 at 1st" style hints. Re-fetches when
-  // the grade changes.
-  useEffect(() => {
-    if (status !== "authenticated" || !formData.grade_level) return;
-    const controller = new AbortController();
-    (async () => {
-      const params = new URLSearchParams({
-        gradeLevel: formData.grade_level,
-        byWorld: "1",
-      });
-      const res = await fetch(`/api/words/stats?${params}`, {
-        signal: controller.signal,
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.countsByWorld) setWorldCounts(data.countsByWorld);
-      }
-    })().catch(() => {
-      // Counts are decorative; silent on errors.
-    });
-    return () => controller.abort();
-  }, [formData.grade_level, status]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -532,23 +517,11 @@ export default function WordDetailPage({
                     }}
                     className="input"
                   >
-                    {Object.values(WORLDS).map((w) => {
-                      const count = worldCounts?.[w.id];
-                      const suffix =
-                        count !== undefined
-                          ? ` · ${count} at ${GRADE_LEVEL_LABEL[formData.grade_level]}`
-                          : "";
-                      return (
-                        <option
-                          key={w.id}
-                          value={w.id}
-                          title={w.description}
-                        >
-                          {w.emoji} {w.name}
-                          {suffix}
-                        </option>
-                      );
-                    })}
+                    {Object.values(WORLDS).map((w) => (
+                      <option key={w.id} value={w.id} title={w.description}>
+                        {w.emoji} {w.name}
+                      </option>
+                    ))}
                   </select>
                   {(() => {
                     const selected = worldForCategory(formData.category).world;
