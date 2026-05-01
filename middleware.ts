@@ -14,6 +14,11 @@ export default auth((req) => {
   // (duplicate sweeps, etc.) — auth is enforced in-handler too.
   const isDeclineApi =
     /^\/api\/words\/[^/]+\/decline$/.test(pathname);
+  // Per-word image redirect is intentionally public — the Wordnauts iOS
+  // app loads images by word ID with no session, and the underlying
+  // presigned URL is itself short-lived and unguessable.
+  const isWordImageApi =
+    /^\/api\/words\/[^/]+\/image$/.test(pathname);
   // Invite links are emailed to recipients who do not yet have accounts,
   // so the token page and its validation/accept APIs must be reachable
   // without a session.
@@ -46,6 +51,11 @@ export default auth((req) => {
   // (token validation + accept). Authorization is enforced in-handler by
   // matching the token, not by the session.
   if (isInvitePage || isInviteApi) {
+    return NextResponse.next();
+  }
+
+  // Allow public image redirects (no auth — iOS app needs them).
+  if (isWordImageApi) {
     return NextResponse.next();
   }
 
