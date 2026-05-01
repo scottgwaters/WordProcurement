@@ -314,6 +314,9 @@ function BucketReview({
   // Default ON — once a reviewer verifies a word they usually want it gone
   // from the queue so they can power through the remaining pending pile.
   const [hideVerified, setHideVerified] = useState(true);
+  // Default ON — flagged words are parked for someone else to look at, so
+  // they shouldn't clutter the regular review pile.
+  const [hideFlagged, setHideFlagged] = useState(true);
 
   const worldMeta = WORLDS[world];
 
@@ -429,9 +432,10 @@ function BucketReview({
   const pendingCount = words.filter((w) => !w.verified && !w.declined).length;
   const verifiedCount = words.filter((w) => w.verified).length;
   const declinedCount = words.filter((w) => w.declined).length;
-  const visibleWords = hideVerified
-    ? words.filter((w) => !w.verified)
-    : words;
+  const flaggedCount = words.filter((w) => w.flagged).length;
+  const visibleWords = words.filter(
+    (w) => !(hideVerified && w.verified) && !(hideFlagged && w.flagged),
+  );
 
   return (
     <div className="min-h-screen">
@@ -488,6 +492,30 @@ function BucketReview({
                   </span>
                 </span>
               </button>
+              <button
+                type="button"
+                onClick={() => setHideFlagged((v) => !v)}
+                className="hide-verified-btn"
+                aria-pressed={hideFlagged}
+                title={
+                  hideFlagged
+                    ? "Show flagged words in the list"
+                    : "Hide flagged words from the list"
+                }
+              >
+                <span
+                  className="bucket-review-counter__num"
+                  style={{ color: "var(--warning)" }}
+                >
+                  {flaggedCount}
+                </span>
+                <span className="bucket-review-counter__label flex items-center gap-1">
+                  Flagged
+                  <span aria-hidden="true">
+                    {hideFlagged ? "🙈" : "👁"}
+                  </span>
+                </span>
+              </button>
               {declinedCount > 0 && (
                 <div>
                   <div
@@ -515,9 +543,14 @@ function BucketReview({
             <div className="text-4xl mb-4">🎉</div>
             <h2 className="text-xl font-semibold mb-2">All caught up!</h2>
             <p className="text-[var(--text-secondary)]">
-              {hideVerified && verifiedCount > 0
-                ? `${verifiedCount} verified ${verifiedCount === 1 ? "word is" : "words are"} hidden — toggle "Verified" to show them.`
-                : "No words pending review in this bucket."}
+              {(() => {
+                const hidden: string[] = [];
+                if (hideVerified && verifiedCount > 0) hidden.push(`${verifiedCount} verified`);
+                if (hideFlagged && flaggedCount > 0) hidden.push(`${flaggedCount} flagged`);
+                if (hidden.length === 0) return "No words pending review in this bucket.";
+                const total = (hideVerified ? verifiedCount : 0) + (hideFlagged ? flaggedCount : 0);
+                return `${hidden.join(" and ")} ${total === 1 ? "word is" : "words are"} hidden — toggle to show them.`;
+              })()}
             </p>
             <Link href="/review" className="btn btn-secondary mt-6 inline-flex">
               Pick another bucket
