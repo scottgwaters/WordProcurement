@@ -3,14 +3,37 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useEffect, useState } from "react";
 
 export default function Header() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: "/login" });
   };
+
+  // Close the drawer whenever the route changes — reviewers tapping a nav
+  // item should land on the new page with the drawer dismissed.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  // Lock background scroll while the drawer is open + handle Escape to dismiss.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [drawerOpen]);
 
   const navItems = [
     { href: "/", label: "Dashboard" },
@@ -22,19 +45,18 @@ export default function Header() {
     ...(session?.user?.isAdmin ? [{ href: "/admin/users", label: "Users" }] : []),
   ];
 
+  const email = session?.user?.email ?? "";
+  const avatarLetter = email ? email[0]?.toUpperCase() : "?";
+
   return (
-    <header className="bg-white border-b border-[var(--border-light)] sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-semibold text-[var(--text-primary)]">
-              Word Procurement
-            </span>
+    <>
+      <header className="app-header">
+        <div className="app-header__inner">
+          <Link href="/" className="app-header__brand">
+            Word Procurement
           </Link>
 
-          {/* Navigation */}
-          <nav className="flex items-center gap-1">
+          <nav className="app-header__nav" aria-label="Main">
             {navItems.map((item) => {
               const active = pathname === item.href;
               return (
@@ -42,32 +64,31 @@ export default function Header() {
                   key={item.href}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`relative px-3 py-2 text-sm transition-colors ${
-                    active
-                      ? "text-[var(--text-primary)] font-semibold"
-                      : "text-[var(--text-secondary)] font-normal hover:text-[var(--text-primary)]"
-                  }`}
+                  className="app-header__link"
                 >
                   {item.label}
-                  {active && (
-                    <span
-                      aria-hidden
-                      className="absolute left-3 right-3 -bottom-[17px] h-[2px] bg-[var(--accent)]"
-                    />
-                  )}
                 </Link>
               );
             })}
           </nav>
 
-          {/* User menu */}
-          <div className="flex items-center gap-4">
+          <div className="app-header__user">
             {session?.user ? (
               <>
-                <span className="text-sm text-[var(--text-secondary)]">
-                  {session.user.email}
+                <span className="app-header__email" title={email}>
+                  {email}
                 </span>
-                <button onClick={handleSignOut} className="btn btn-secondary text-sm">
+                <span
+                  className="app-header__avatar"
+                  aria-label={email}
+                  title={email}
+                >
+                  {avatarLetter}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="btn btn-secondary text-sm"
+                >
                   Sign out
                 </button>
               </>
@@ -77,8 +98,94 @@ export default function Header() {
               </Link>
             )}
           </div>
+
+          <button
+            type="button"
+            className="app-header__menu-btn"
+            aria-label="Open menu"
+            aria-expanded={drawerOpen}
+            aria-controls="app-drawer"
+            onClick={() => setDrawerOpen(true)}
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <line x1="4" y1="7" x2="20" y2="7" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="17" x2="20" y2="17" />
+            </svg>
+          </button>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {drawerOpen && (
+        <>
+          <div
+            className="app-drawer-backdrop"
+            onClick={() => setDrawerOpen(false)}
+            aria-hidden="true"
+          />
+          <aside
+            id="app-drawer"
+            className="app-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main menu"
+          >
+            <div className="app-drawer__head">
+              <span className="app-drawer__title">Menu</span>
+              <button
+                type="button"
+                className="app-drawer__close"
+                aria-label="Close menu"
+                onClick={() => setDrawerOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <nav className="app-drawer__nav" aria-label="Main">
+              {navItems.map((item) => {
+                const active = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className="app-drawer__link"
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="app-drawer__foot">
+              {session?.user ? (
+                <>
+                  <span className="app-drawer__email">{email}</span>
+                  <button
+                    onClick={handleSignOut}
+                    className="btn btn-secondary"
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" className="btn btn-primary">
+                  Sign in
+                </Link>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
+    </>
   );
 }

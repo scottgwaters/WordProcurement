@@ -78,6 +78,11 @@
 
 * { box-sizing: border-box; }
 
+html, body {
+  /* 16px base prevents iOS Safari from auto-zooming when an input is focused. */
+  font-size: 16px;
+}
+
 body {
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -85,6 +90,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
+  /* Hide accidental horizontal scroll only at the page level — fix the actual
+     overflow source rather than letting it bleed sideways. */
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Inputs at 16px min so iOS Safari doesn't trigger the focus-zoom. */
+input, select, textarea {
+  font-size: 16px;
 }
 
 /* ---------- Card ---------- */
@@ -304,14 +318,9 @@ textarea.input { height: auto; padding: 8px 12px; min-height: 80px; }
   border-color: #a5b4fc;
 }
 
-/* Grade-level palette — six steps from warm yellow (Pre-K) through
-   teal (K) and greens (1st–2nd) to indigo (4th), so reviewers can
-   read the grade at a glance the way the old age palette worked. */
-.badge-grade-prek {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #fcd34d;
-}
+/* Grade-level palette — five steps from teal (K) through greens (1st–2nd)
+   to indigo (4th), so reviewers can read the grade at a glance the way
+   the old age palette worked. Pre-K was retired in 2026-04. */
 .badge-grade-k {
   background: #ccfbf1;
   color: #115e59;
@@ -944,5 +953,527 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
 .bucket-table tbody tr:last-child .bucket-td,
 .bucket-table tbody tr:last-child .bucket-row-head {
   border-bottom: none;
+}
+
+/* ===========================================================================
+   Responsive layer — mobile-first overrides for /review and shared chrome.
+   Desktop ≥1280px is the existing canonical look; everything below shrinks
+   gracefully without changing the desktop appearance.
+   =========================================================================== */
+
+/* ---------- Touch targets & input zoom guards ---------- */
+
+/* Apple HIG minimum touch target (44×44pt). Apply to chrome that's tappable
+   but currently sized smaller. .btn already pads to ~40px tall — bump it on
+   touch devices specifically so desktop chrome stays compact. */
+@media (max-width: 1023px) {
+  .btn {
+    min-height: 44px;
+    padding-block: 12px;
+  }
+}
+
+/* ---------- Header / nav ---------- */
+
+.app-header {
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  /* iOS Safari adds inset for the dynamic island/home indicator; padding-top
+     keeps the bar below the status bar when used as a PWA. */
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.app-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 64px;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 32px);
+}
+
+.app-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.app-header__brand:hover { text-decoration: none; color: var(--text-primary); }
+
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-header__link {
+  position: relative;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: 6px;
+  transition: color 120ms var(--ease), background-color 120ms var(--ease);
+  white-space: nowrap;
+}
+.app-header__link:hover { color: var(--text-primary); text-decoration: none; }
+.app-header__link[aria-current="page"] {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.app-header__link[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -17px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.app-header__user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header__email {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header__avatar {
+  display: none;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-softer);
+  color: var(--accent-active);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border-light);
+}
+
+/* Hamburger button — shown on mobile only */
+.app-header__menu-btn {
+  display: none;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.app-header__menu-btn:hover { background: var(--bg-tertiary); }
+.app-header__menu-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Drawer */
+.app-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 60;
+  animation: drawer-fade 160ms var(--ease);
+}
+
+.app-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100dvh;
+  width: min(320px, 86vw);
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-light);
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  animation: drawer-slide 200ms var(--ease);
+  box-shadow: -4px 0 24px rgba(15, 23, 42, 0.12);
+}
+
+.app-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.app-drawer__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.app-drawer__close {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.app-drawer__close:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
+.app-drawer__nav {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 2px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.app-drawer__link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  border-radius: 8px;
+}
+.app-drawer__link:hover { background: var(--bg-tertiary); text-decoration: none; }
+.app-drawer__link[aria-current="page"] {
+  background: var(--accent-softer);
+  color: var(--accent-active);
+  font-weight: 600;
+}
+
+.app-drawer__foot {
+  border-top: 1px solid var(--border-light);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-drawer__email {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+@keyframes drawer-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes drawer-slide {
+  from { transform: translateX(100%) }
+  to { transform: translateX(0) }
+}
+
+/* Tablet — collapse email to avatar so the row stays single-line */
+@media (max-width: 1023px) {
+  .app-header__email { display: none; }
+  .app-header__avatar { display: inline-flex; }
+}
+
+/* Mobile — swap nav for hamburger drawer */
+@media (max-width: 767px) {
+  .app-header__nav,
+  .app-header__user {
+    display: none;
+  }
+  .app-header__menu-btn {
+    display: inline-flex;
+  }
+}
+
+/* ---------- Bucket review header (← Change bucket / pending / verified) ---------- */
+
+.bucket-review-header__inner {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 32px);
+  padding-block: 16px;
+}
+
+.bucket-review-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 4px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+.bucket-review-back:hover { color: var(--text-primary); }
+
+.bucket-review-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.bucket-review-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: clamp(1.125rem, 3.5vw, 1.5rem);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.bucket-review-title__sep {
+  color: var(--text-tertiary);
+}
+
+.bucket-review-title__world {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bucket-review-counters {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  text-align: right;
+}
+
+.bucket-review-counter__num {
+  font-size: clamp(1.25rem, 6vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.bucket-review-counter__label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Mobile — stack into two rows: title chips on row 1, counters full-width on row 2 */
+@media (max-width: 767px) {
+  .bucket-review-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .bucket-review-counters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 8px;
+    text-align: center;
+  }
+  .bucket-review-counters > * {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .hide-verified-btn {
+    align-items: center;
+  }
+}
+
+/* ---------- Generic fluid main container ---------- */
+
+.page-container {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 32px);
+  padding-block: clamp(16px, 4vw, 32px);
+}
+
+/* ---------- Word card — responsive ---------- */
+
+@media (max-width: 767px) {
+  /* Stack image / content / status vertically on phones. */
+  .review-card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .review-card-image,
+  .review-card-image-button {
+    align-self: flex-start;
+  }
+  .review-card-image {
+    width: 96px;
+    height: 96px;
+  }
+}
+
+/* Big word title — fluid scale on small screens, original 40px on desktop */
+.word-display--xl {
+  font-size: clamp(1.75rem, 7vw, 2.5rem);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+/* Definition / pronunciation blocks — fluid type, full width on mobile */
+.review-def__body {
+  font-size: clamp(0.9375rem, 3.6vw, 1rem);
+  line-height: 1.5;
+}
+
+@media (max-width: 479px) {
+  .review-def__body {
+    padding: 12px 14px;
+  }
+}
+
+/* ---------- Hints table — stack on small phones ---------- */
+
+@media (max-width: 479px) {
+  .review-hints__row {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    grid-template-areas:
+      "num pill ."
+      "text text text";
+    gap: 8px 10px;
+    padding: 12px 14px;
+  }
+  .review-hints__num { grid-area: num; }
+  .review-hints__pill {
+    grid-area: pill;
+    margin-right: 0;
+    min-width: 64px;
+  }
+  .review-hints__text {
+    grid-area: text;
+    font-size: 0.9375rem;
+  }
+}
+
+/* ---------- Action bar — sticky bottom on mobile ---------- */
+
+/* Desktop: keep the inline row that lives inside .card. The classes below
+   only kick in below 1024px. */
+.review-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.review-actions__spacer { flex: 1 1 auto; }
+
+/* Default: let Skip / Edit / Flag flow as siblings of Decline / Approve so
+   the desktop and tablet rows look identical to the legacy single-flex row.
+   On mobile this becomes its own flex row inside the sticky bar. */
+.review-actions__secondary { display: contents; }
+
+@media (max-width: 1023px) {
+  .review-actions {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .review-actions__spacer { display: none; }
+}
+
+@media (max-width: 767px) {
+  .review-actions {
+    /* Pin to viewport bottom so reviewers can act without scrolling. */
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    margin-top: 24px;
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+    backdrop-filter: saturate(180%) blur(10px);
+    border-top: 1px solid var(--border-light);
+    border-radius: 12px 12px 0 0;
+    /* Subtle elevation so the bar lifts off the card content underneath */
+    box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.06);
+    /* Two-row grid: primary actions on top (full-width), secondary below */
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "decline approve"
+      "secondary secondary";
+    gap: 8px;
+  }
+  .review-actions [data-action="decline"] {
+    grid-area: decline;
+    width: 100%;
+    min-width: 0;
+  }
+  .review-actions [data-action="approve"] {
+    grid-area: approve;
+    width: 100%;
+    min-width: 0;
+  }
+  .review-actions__secondary {
+    grid-area: secondary;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .review-actions__secondary .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 10px 8px;
+  }
+}
+
+/* ---------- Bucket picker table — let it scroll horizontally on small screens ---------- */
+
+@media (max-width: 767px) {
+  .bucket-card { padding: 4px; }
+  .bucket-cell-wrap { min-height: 56px; }
+  .bucket-cell__num { font-size: 1.0625rem; }
+  .bucket-th { padding: 12px 8px; }
+  .bucket-th--world,
+  .bucket-th--grade,
+  .bucket-th--total { min-width: 100px; }
+  .bucket-th__icon { font-size: 22px; }
+  .bucket-th__label { font-size: 0.75rem; }
+  .bucket-row-head { padding: 12px; min-width: 100px; }
+}
+
+/* ---------- FlagDialog touch ---------- */
+
+@media (max-width: 767px) {
+  .flag-dialog {
+    max-width: 100%;
+    margin: 16px;
+    border-radius: 14px;
+  }
 }
 

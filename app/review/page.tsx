@@ -435,61 +435,73 @@ function BucketReview({
     <div className="min-h-screen">
       <Header />
       <div className="bucket-review-header">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <Link
-            href="/review"
-            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
+        <div className="bucket-review-header__inner">
+          <Link href="/review" className="bucket-review-back">
             ← Change bucket
           </Link>
-          <div className="flex items-center justify-between mt-2 gap-4 flex-wrap">
-            <h1 className="text-2xl font-semibold text-[var(--text-primary)] flex items-center gap-3 flex-wrap">
+          <div className="bucket-review-row">
+            <h1 className="bucket-review-title">
               {gradeRow === "ungraded" ? (
                 <span className="badge badge-warning">⚠ Ungraded</span>
               ) : (
                 <GradeBadge value={gradeRow} size="md" />
               )}
-              <span className="text-[var(--text-tertiary)]">·</span>
-              <span className="flex items-center gap-2">
+              <span className="bucket-review-title__sep">·</span>
+              <span className="bucket-review-title__world">
                 <span aria-hidden="true">{worldMeta.emoji}</span>
                 <span>{worldMeta.name}</span>
               </span>
             </h1>
-            <div className="flex items-center gap-4 text-right">
+            <div className="bucket-review-counters">
               <div>
-                <div className="text-2xl font-semibold text-[var(--warning)]">
+                <div
+                  className="bucket-review-counter__num"
+                  style={{ color: "var(--warning)" }}
+                >
                   {pendingCount}
                 </div>
-                <div className="text-xs text-[var(--text-secondary)]">Pending</div>
+                <div className="bucket-review-counter__label">Pending</div>
               </div>
               <button
                 type="button"
                 onClick={() => setHideVerified((v) => !v)}
                 className="hide-verified-btn"
                 aria-pressed={hideVerified}
-                title={hideVerified ? "Show verified words in the list" : "Hide verified words from the list"}
+                title={
+                  hideVerified
+                    ? "Show verified words in the list"
+                    : "Hide verified words from the list"
+                }
               >
-                <span className="text-2xl font-semibold text-[var(--success)]">
+                <span
+                  className="bucket-review-counter__num"
+                  style={{ color: "var(--success)" }}
+                >
                   {verifiedCount}
                 </span>
-                <span className="text-xs text-[var(--text-secondary)] flex items-center gap-1">
+                <span className="bucket-review-counter__label flex items-center gap-1">
                   Verified
-                  <span aria-hidden="true">{hideVerified ? "🙈" : "👁"}</span>
+                  <span aria-hidden="true">
+                    {hideVerified ? "🙈" : "👁"}
+                  </span>
                 </span>
               </button>
               {declinedCount > 0 && (
                 <div>
-                  <div className="text-2xl font-semibold text-[var(--error)]">
+                  <div
+                    className="bucket-review-counter__num"
+                    style={{ color: "var(--error)" }}
+                  >
                     {declinedCount}
                   </div>
-                  <div className="text-xs text-[var(--text-secondary)]">Declined</div>
+                  <div className="bucket-review-counter__label">Declined</div>
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="page-container max-w-4xl">
 
         {loading ? (
           <div className="card p-12 text-center">

@@ -71,7 +71,7 @@ export default function FlagDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:px-4 bg-black/40"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
@@ -80,7 +80,10 @@ export default function FlagDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="flag-dialog-title"
-        className="w-full max-w-md rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] shadow-xl overflow-hidden"
+        className="flag-dialog w-full max-w-md rounded-t-2xl sm:rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] shadow-xl overflow-hidden"
+        style={{
+          paddingBottom: "env(safe-area-inset-bottom, 0)",
+        }}
       >
         <div className="p-6">
           <h2
