@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
       objects: 0, magic: 0, sight: 0, feelings: 0,
     });
     pendingByWorldAndGrade = {
-      prek: empty(), k: empty(), "1": empty(),
+      k: empty(), "1": empty(),
       "2": empty(), "3": empty(), "4": empty(),
       ungraded: empty(),
     };

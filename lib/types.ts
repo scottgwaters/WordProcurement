@@ -1,13 +1,12 @@
 // Word data types for Word Procurement
 
 export type AgeGroup = "4-6" | "7-9" | "10-12";
-export type GradeLevel = "prek" | "k" | "1" | "2" | "3" | "4";
+export type GradeLevel = "k" | "1" | "2" | "3" | "4";
 export type Level = 1 | 2 | 3;
 
-export const GRADE_LEVELS: GradeLevel[] = ["prek", "k", "1", "2", "3", "4"];
+export const GRADE_LEVELS: GradeLevel[] = ["k", "1", "2", "3", "4"];
 
 export const GRADE_LEVEL_LABEL: Record<GradeLevel, string> = {
-  prek: "Pre-K",
   k: "K",
   "1": "1st",
   "2": "2nd",

@@ -63,7 +63,6 @@ export default async function ReportsPage() {
   ]);
 
   const byGrade: Record<GradeRow, Record<WorldId, Record<Level, Counts>>> = {
-    prek: emptyWorldMatrix(),
     k: emptyWorldMatrix(),
     "1": emptyWorldMatrix(),
     "2": emptyWorldMatrix(),

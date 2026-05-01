@@ -5,7 +5,6 @@ const GRADE_PRESETS: Record<
   GradeLevel,
   { icon: string; label: string; className: string }
 > = {
-  prek: { icon: "/grade-icons/chick.png", label: "Pre-K", className: "grade-pill--prek" },
   k:    { icon: "/grade-icons/bunny.png", label: "K",     className: "grade-pill--k" },
   "1":  { icon: "/grade-icons/fox.png",   label: "1st",   className: "grade-pill--1" },
   "2":  { icon: "/grade-icons/deer.png",  label: "2nd",   className: "grade-pill--2" },
