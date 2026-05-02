@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 import { useDialog } from "@/components/Dialog";
+import ImageGeneratePanel from "@/components/ImageGeneratePanel";
 
 export default function WordDetailPage({
   params,
@@ -832,6 +833,8 @@ export default function WordDetailPage({
                 )}
               </div>
             </div>
+
+            <ImageGeneratePanel wordId={resolvedParams.id} />
 
             {/* Save button */}
             <button

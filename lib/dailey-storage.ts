@@ -7,7 +7,7 @@
 // returned 401 even with a freshly-issued token. The SDK path is what
 // Dailey's docs recommend and survives the upcoming per-project R2
 // migration unchanged (S3_KEY_PREFIX becomes empty, code stays the same).
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const PRESIGN_TTL_SECONDS = 3600;
@@ -84,4 +84,47 @@ export function imageKeyForWord(word: { id: string; category: string }): string 
         return "shared/sight-word.png";
     }
     return `words/${word.id}.png`;
+}
+
+/**
+ * Mint a presigned PUT URL the worker can stream the generated PNG into.
+ * The caller (the Python image worker) must `Content-Type: image/png` on
+ * the upload — anything else and S3 will sign-mismatch.
+ */
+export async function presignUpload(key: string): Promise<{ url: string; full_key: string; bucket: string }> {
+    const bucket = process.env.S3_BUCKET_NAME;
+    const prefix = STORAGE_KEY_PREFIX;
+    if (!bucket) throw new Error("S3_BUCKET_NAME missing from pod env");
+    const fullKey = prefix + key;
+    const url = await getSignedUrl(
+        makeS3Client(),
+        new PutObjectCommand({ Bucket: bucket, Key: fullKey, ContentType: "image/png" }),
+        { expiresIn: 600 },
+    );
+    return { url, full_key: fullKey, bucket };
+}
+
+/**
+ * Drop the cached download URL for a key after a fresh upload, so the next
+ * /api/words/<id>/image request mints a brand-new presign instead of
+ * 302-ing browsers at the stale (but-still-valid) URL pointing at the old
+ * object content. R2 rewrites the object atomically on PUT, but some
+ * browser/cache layers will keep showing the prior bytes from the cached
+ * redirect target until the URL itself rotates.
+ */
+export function invalidatePresignCache(key: string): void {
+    cache.delete(key);
+}
+
+/**
+ * Delete the object outright. Currently unused but handy if we ever want a
+ * "clear image and revert to placeholder" affordance on the panel.
+ */
+export async function deleteObject(key: string): Promise<void> {
+    const bucket = process.env.S3_BUCKET_NAME;
+    if (!bucket) throw new Error("S3_BUCKET_NAME missing from pod env");
+    await makeS3Client().send(
+        new DeleteObjectCommand({ Bucket: bucket, Key: STORAGE_KEY_PREFIX + key }),
+    );
+    cache.delete(key);
 }

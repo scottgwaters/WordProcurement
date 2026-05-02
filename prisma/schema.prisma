@@ -19,6 +19,8 @@ model User {
   activityLogs   ActivityLog[]
   invitesCreated InviteToken[]  @relation("InvitedBy")
   wordLeases     WordLease[]
+  imageJobs      ImageJob[]
+  notifications  Notification[]
 
   @@map("users")
 }
@@ -79,6 +81,7 @@ model Word {
 
   activityLogs ActivityLog[]
   lease        WordLease?
+  imageJobs    ImageJob[]
 
   @@index([category])
   @@index([ageGroup])
@@ -118,4 +121,59 @@ model ActivityLog {
   @@index([wordId])
   @@index([userId])
   @@map("activity_log")
+}
+
+// Queue of image-generation requests. The website enqueues a row; a local
+// worker process polls /api/image-jobs/next, claims one, runs ComfyUI/Flux,
+// uploads to R2, then POSTs /complete. Status flow:
+//   pending  → claimed (worker picked it up)
+//            → done    (PNG live in R2 at words/<word_id>.png)
+//            → failed  (worker error; errorMessage populated)
+// Older done/failed rows are kept for audit and "show me the prompt I used
+// last time"; the UI only shows the most recent row per word.
+model ImageJob {
+  id             String    @id @default(cuid())
+  wordId         String    @map("word_id")
+  word           Word      @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  // Free-form note from the curator: "make it more vibrant", "show two of
+  // them", "no humans". Worker appends this to the category-template prompt.
+  promptNote     String?   @map("prompt_note") @db.Text
+  // Optional style override the curator picked from a dropdown (e.g.
+  // "watercolor" / "flat" / "sticker"). Worker maps this to a style suffix.
+  style          String?
+  status         String    @default("pending") // pending | claimed | done | failed
+  errorMessage   String?   @map("error_message") @db.Text
+  // What the worker actually fed into Flux — captured so the curator can
+  // see it on the panel and decide what to tweak next.
+  finalPrompt    String?   @map("final_prompt") @db.Text
+  textWarning    String?   @map("text_warning") @db.Text
+  requestedById  String    @map("requested_by")
+  requestedBy    User      @relation(fields: [requestedById], references: [id])
+  createdAt      DateTime  @default(now()) @map("created_at")
+  claimedAt      DateTime? @map("claimed_at")
+  completedAt    DateTime? @map("completed_at")
+
+  @@index([wordId])
+  @@index([status])
+  @@map("image_jobs")
+}
+
+// In-app notifications. Currently used to tell the curator that an
+// ImageJob they kicked off has finished (success or failure). Kept generic
+// so other event sources (verification milestones, flag responses) can
+// reuse it without a schema change.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id])
+  // e.g. "image_done" / "image_failed" — used by the bell-icon UI to pick
+  // an icon and decide whether to render the link target as a deep link.
+  kind      String
+  message   String    @db.Text
+  link      String?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, readAt])
+  @@map("notifications")
 }

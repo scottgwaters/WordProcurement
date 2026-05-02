@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
+import NotificationsBell from "./NotificationsBell";
 
 export default function Header() {
   const pathname = usePathname();
@@ -75,6 +76,7 @@ export default function Header() {
           <div className="app-header__user">
             {session?.user ? (
               <>
+                <NotificationsBell />
                 <span className="app-header__email" title={email}>
                   {email}
                 </span>

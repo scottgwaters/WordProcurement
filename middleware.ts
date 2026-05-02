@@ -14,6 +14,12 @@ export default auth((req) => {
   // (duplicate sweeps, etc.) — auth is enforced in-handler too.
   const isDeclineApi =
     /^\/api\/words\/[^/]+\/decline$/.test(pathname);
+  // Image-job worker endpoints. The local Python poller carries
+  // IMPORT_API_TOKEN to claim/complete jobs; in-handler bearer check
+  // re-validates so the middleware bypass is never load-bearing on its own.
+  const isImageWorkerApi =
+    pathname === "/api/image-jobs/next" ||
+    /^\/api\/image-jobs\/[^/]+\/complete$/.test(pathname);
   // Per-word image redirect is intentionally public — the Wordnauts iOS
   // app loads images by word ID with no session, and the underlying
   // presigned URL is itself short-lived and unguessable.
@@ -38,7 +44,7 @@ export default auth((req) => {
   // token (defense-in-depth alongside route handler check). The storage-test
   // endpoint is a developer diagnostic that needs to be curl-able from
   // outside a browser session.
-  if (isImportApi || isStorageTestApi || isDeclineApi) {
+  if (isImportApi || isStorageTestApi || isDeclineApi || isImageWorkerApi) {
     const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     const expected = process.env.IMPORT_API_TOKEN;
     if (bearer && expected && bearer === expected) {

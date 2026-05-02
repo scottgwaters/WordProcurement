@@ -1070,6 +1070,126 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   border: 1px solid var(--border-light);
 }
 
+/* Notifications bell */
+.notif-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.notif-bell:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.notif-bell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.notif-bell__dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--error);
+  color: white;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.notif-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 360px;
+  max-width: 92vw;
+  max-height: 70vh;
+  overflow: hidden;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+.notif-popover__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.875rem;
+}
+.notif-popover__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.notif-popover__list > li {
+  border-bottom: 1px solid var(--border-light);
+}
+.notif-popover__list > li:last-child {
+  border-bottom: none;
+}
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  text-decoration: none;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+.notif-item:hover {
+  background: var(--bg-secondary);
+  text-decoration: none;
+}
+.notif-item__icon {
+  font-size: 1.125rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.notif-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.notif-item__msg {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+.notif-item__time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.notif-item__pip {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
 /* Hamburger button — shown on mobile only */
 .app-header__menu-btn {
   display: none;
