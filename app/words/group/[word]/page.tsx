@@ -76,7 +76,6 @@ export default function GroupedWordPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [worldCounts, setWorldCounts] = useState<Record<WorldId, number> | null>(null);
 
   const fetchGroup = useCallback(async () => {
     if (status !== "authenticated") return;
@@ -127,18 +126,6 @@ export default function GroupedWordPage({
     if (status === "unauthenticated") router.push("/login");
     if (status === "authenticated") fetchGroup();
   }, [status, fetchGroup, router]);
-
-  // Per-world totals for the currently-selected (shared) category's age
-  // group set — purely informational so the curator sees where variants live.
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    fetch(`/api/words/stats?byWorld=1`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.countsByWorld) setWorldCounts(data.countsByWorld);
-      })
-      .catch(() => {});
-  }, [status]);
 
   // Show a warning if any "shared" field actually differs across
   // variants today — saving will unify them, but the reviewer should
@@ -371,16 +358,11 @@ export default function GroupedWordPage({
                 }}
                 className="input"
               >
-                {Object.values(WORLDS).map((w) => {
-                  const count = worldCounts?.[w.id];
-                  const suffix = count !== undefined ? ` · ${count} words` : "";
-                  return (
-                    <option key={w.id} value={w.id} title={w.description}>
-                      {w.emoji} {w.name}
-                      {suffix}
-                    </option>
-                  );
-                })}
+                {Object.values(WORLDS).map((w) => (
+                  <option key={w.id} value={w.id} title={w.description}>
+                    {w.emoji} {w.name}
+                  </option>
+                ))}
               </select>
               {currentWorld && (
                 <p className="text-xs mt-1 text-[var(--text-secondary)] leading-relaxed">

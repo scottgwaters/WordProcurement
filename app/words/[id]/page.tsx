@@ -8,6 +8,7 @@ import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
+import { useDialog } from "@/components/Dialog";
 
 export default function WordDetailPage({
   params,
@@ -87,6 +88,7 @@ export default function WordDetailPage({
 
   const router = useRouter();
   const { status } = useSession();
+  const dlg = useDialog();
 
   const fetchActivity = useCallback(async () => {
     const response = await fetch(`/api/words/${resolvedParams.id}/activity`);
@@ -258,6 +260,36 @@ export default function WordDetailPage({
     }
 
     setIsSaving(false);
+  };
+
+  // Hard delete — for unambiguous mistakes (duplicate rows for the same
+  // spelling at the same grade, junk seeds). Two-step: typed-confirm prompt
+  // followed by the actual DELETE. Decline is the right choice for "this
+  // word doesn't belong" since it preserves the audit trail; this is for
+  // "this row shouldn't exist at all".
+  const handleDelete = async () => {
+    if (!word) return;
+    const typed = await dlg.prompt({
+      title: `Delete ${word.word}?`,
+      message:
+        "This permanently removes the word and its activity history. Use Decline instead if you want to keep an audit trail. Type the word to confirm.",
+      placeholder: word.word,
+      okLabel: "Delete permanently",
+      validate: (v) =>
+        v.trim().toUpperCase() === word.word.toUpperCase() ? null : "Doesn't match",
+    });
+    if (typed === null) return;
+    const res = await fetch(`/api/words/${resolvedParams.id}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push(backHref);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      await dlg.alert({
+        title: "Couldn't delete this word",
+        message: data.error ?? "Please try again.",
+        tone: "error",
+      });
+    }
   };
 
   const handleUndecline = async () => {
@@ -789,6 +821,18 @@ export default function WordDetailPage({
               ) : (
                 "Save Changes"
               )}
+            </button>
+
+            {/* Delete (hard) — for unambiguous mistakes only. Decline is the
+                better choice for "this word doesn't belong" since it preserves
+                the audit trail and survives re-imports. */}
+            <button
+              onClick={handleDelete}
+              disabled={!!lockedBy}
+              title={lockedBy ? `${lockedBy} is editing this word` : "Permanently delete this word"}
+              className="btn btn-danger text-sm"
+            >
+              Delete word permanently
             </button>
 
             {/* Activity History */}

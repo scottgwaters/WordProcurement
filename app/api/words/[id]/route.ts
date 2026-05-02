@@ -312,3 +312,35 @@ export async function PATCH(
 
   return NextResponse.json(response);
 }
+
+// DELETE /api/words/[id] - Hard-delete a word.
+//
+// Distinct from "decline": decline is a soft-delete that survives re-imports
+// and stays auditable. Delete is for unambiguous mistakes — duplicate rows
+// for the same spelling at the same grade, junk seeds, etc. The cascading
+// FKs on WordLease and ActivityLog clean those up automatically, so the
+// row goes away entirely.
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  const resolvedParams = await params;
+
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const existing = await prisma.word.findUnique({
+    where: { id: resolvedParams.id },
+    select: { id: true, word: true },
+  });
+
+  if (!existing) {
+    return NextResponse.json({ error: "Word not found" }, { status: 404 });
+  }
+
+  await prisma.word.delete({ where: { id: resolvedParams.id } });
+
+  return NextResponse.json({ success: true, deleted: existing.word });
+}
