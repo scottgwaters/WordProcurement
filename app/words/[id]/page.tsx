@@ -51,6 +51,7 @@ export default function WordDetailPage({
     level: Level;
     category: string;
     verified: boolean;
+    declined: boolean;
   };
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
   // Soft-lock state: if someone else is already editing this word, we
@@ -397,48 +398,74 @@ export default function WordDetailPage({
           </div>
         </div>
 
-        {duplicates.length > 0 && (
-          <div className="bg-[var(--warning-bg)] border border-[var(--warning)] px-4 py-3 rounded-lg mb-6 text-sm">
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <div className="font-medium text-[var(--warning)]">
-                This spelling already exists elsewhere
+        {duplicates.length > 0 && (() => {
+          // Split declined out so reviewers don't mistake a declined ghost
+          // for a live duplicate they need to reconcile.
+          const live = duplicates.filter((d) => !d.declined);
+          const declinedDupes = duplicates.filter((d) => d.declined);
+          return (
+            <div className="bg-[var(--warning-bg)] border border-[var(--warning)] px-4 py-3 rounded-lg mb-6 text-sm">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="font-medium text-[var(--warning)]">
+                  {live.length > 0
+                    ? "This spelling already exists elsewhere"
+                    : "Other copies of this spelling exist (all declined)"}
+                </div>
+                {live.length > 0 && (
+                  <Link
+                    href={`/words/group/${encodeURIComponent(formData.word)}?from=${from ?? "words"}`}
+                    className="btn btn-secondary text-xs whitespace-nowrap"
+                  >
+                    Edit all variants together →
+                  </Link>
+                )}
               </div>
-              <Link
-                href={`/words/group/${encodeURIComponent(formData.word)}?from=${from ?? "words"}`}
-                className="btn btn-secondary text-xs whitespace-nowrap"
-              >
-                Edit all variants together →
-              </Link>
-            </div>
-            <ul className="space-y-1 text-[var(--text-primary)]">
-              {duplicates.map((d) => {
-                const dWorld = worldForCategory(d.category).world;
-                return (
-                  <li key={d.id} className="flex items-center gap-2">
-                    <Link
-                      href={`/words/${d.id}?from=${from ?? "words"}`}
-                      className="underline hover:no-underline"
+              <ul className="space-y-1 text-[var(--text-primary)]">
+                {[...live, ...declinedDupes].map((d) => {
+                  const dWorld = worldForCategory(d.category).world;
+                  return (
+                    <li
+                      key={d.id}
+                      className={`flex items-center gap-2 ${d.declined ? "opacity-60" : ""}`}
                     >
-                      {d.word}
-                    </Link>
-                    <span className="text-[var(--text-secondary)]">
-                      · {d.gradeLevel ? GRADE_LEVEL_LABEL[d.gradeLevel] : "ungraded"} · level {d.level}
-                      {dWorld ? ` · ${dWorld.emoji} ${dWorld.name}` : ""}
-                    </span>
-                    {d.verified ? (
-                      <span className="badge badge-success">Verified</span>
-                    ) : (
-                      <span className="badge badge-warning">Pending</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="mt-2 text-xs text-[var(--text-secondary)]">
-              Use <span className="font-medium">Edit all variants together</span> to keep shared fields (definition, pronunciation, etc.) in sync across age groups.
-            </p>
-          </div>
-        )}
+                      <Link
+                        href={`/words/${d.id}?from=${from ?? "words"}`}
+                        className={`underline hover:no-underline ${d.declined ? "line-through" : ""}`}
+                      >
+                        {d.word}
+                      </Link>
+                      <span className="text-[var(--text-secondary)]">
+                        · {d.gradeLevel ? GRADE_LEVEL_LABEL[d.gradeLevel] : "ungraded"} · level {d.level}
+                        {dWorld ? ` · ${dWorld.emoji} ${dWorld.name}` : ""}
+                      </span>
+                      {d.declined ? (
+                        <span
+                          className="badge badge-error"
+                          title="Declined — hidden from review and not re-added on import"
+                        >
+                          Declined
+                        </span>
+                      ) : d.verified ? (
+                        <span className="badge badge-success">Verified</span>
+                      ) : (
+                        <span className="badge badge-warning">Pending</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              {live.length > 0 ? (
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  Use <span className="font-medium">Edit all variants together</span> to keep shared fields (definition, pronunciation, etc.) in sync across age groups.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  Declined copies are hidden from the review queue and won&apos;t be re-added on imports. No action needed.
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         {error && (
           <div className="bg-[var(--error-bg)] text-[var(--error)] px-4 py-3 rounded-lg mb-6 text-sm">

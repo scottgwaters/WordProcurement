@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
       level: true,
       category: true,
       verified: true,
+      declined: true,
     },
     orderBy: [{ gradeLevel: "asc" }, { level: "asc" }],
   });
