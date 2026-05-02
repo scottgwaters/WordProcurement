@@ -2,7 +2,7 @@
 // Reviewers need to see which in-game world a word will appear in, since
 // the DB `category` field is finer-grained than the 7 game worlds.
 
-export type WorldId = "animals" | "food" | "nature" | "space" | "objects" | "magic" | "sight" | "feelings";
+export type WorldId = "animals" | "food" | "nature" | "space" | "objects" | "magic" | "sight" | "feelings" | "other";
 
 export interface World {
   id: WorldId;
@@ -80,6 +80,14 @@ export const WORLDS: Record<WorldId, World> = {
       "Emotions, character traits, and virtues — happy, scared, kind, brave, proud, fair. Words that name what's going on inside or describe how someone acts.",
     emoji: "💗",
   },
+  other: {
+    id: "other",
+    name: "Other",
+    tagline: "Doesn't fit a world yet",
+    description:
+      "Curation parking lot — words that don't clearly belong in any of the eight content worlds. Re-categorize before shipping; words left as Other will hash-fallback into a content world on the iOS app.",
+    emoji: "🗂️",
+  },
 };
 
 // Inverse of worldForCategory — the DB categories that map into each world.
@@ -95,6 +103,7 @@ export const CATEGORIES_BY_WORLD: Record<WorldId, string[]> = {
   objects:  ["objects"],
   magic:    ["magic"],
   feelings: ["feelings"],
+  other:    ["other"],
 };
 
 export interface WorldAssignment {
@@ -124,6 +133,12 @@ export function worldForCategory(category: string): WorldAssignment {
       return { world: WORLDS.feelings, ambiguous: false };
     case "magic":
       return { world: WORLDS.magic, ambiguous: false };
+    case "other":
+      return {
+        world: WORLDS.other,
+        ambiguous: false,
+        note: "Curation parking lot — re-categorize before shipping. Words left as Other will hash-fallback into a content world on the iOS app.",
+      };
     default:
       return {
         world: null,

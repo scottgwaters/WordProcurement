@@ -42,7 +42,7 @@ export default async function Dashboard() {
   });
   const worldCounts: Record<WorldId, number> = {
     animals: 0, food: 0, nature: 0, space: 0,
-    objects: 0, magic: 0, sight: 0, feelings: 0,
+    objects: 0, magic: 0, sight: 0, feelings: 0, other: 0,
   };
   (Object.keys(CATEGORIES_BY_WORLD) as WorldId[]).forEach((worldId) => {
     worldCounts[worldId] = CATEGORIES_BY_WORLD[worldId].reduce(

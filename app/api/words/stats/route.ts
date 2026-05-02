@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
       magic: 0,
       sight: 0,
       feelings: 0,
+      other: 0,
     };
     for (const [worldId, cats] of Object.entries(CATEGORIES_BY_WORLD) as [
       WorldId,
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
     });
     const empty = (): Record<WorldId, number> => ({
       animals: 0, food: 0, nature: 0, space: 0,
-      objects: 0, magic: 0, sight: 0, feelings: 0,
+      objects: 0, magic: 0, sight: 0, feelings: 0, other: 0,
     });
     pendingByWorldAndAge = {
       "4-6": empty(), "7-9": empty(), "10-12": empty(),
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
     });
     const empty = (): Record<WorldId, number> => ({
       animals: 0, food: 0, nature: 0, space: 0,
-      objects: 0, magic: 0, sight: 0, feelings: 0,
+      objects: 0, magic: 0, sight: 0, feelings: 0, other: 0,
     });
     pendingByWorldAndGrade = {
       k: empty(), "1": empty(),
