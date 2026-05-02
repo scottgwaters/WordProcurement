@@ -44,8 +44,16 @@ type ExportWord = {
 };
 
 export async function GET(request: NextRequest) {
+  // Dev escape hatch: `?include=all` returns every non-declined word, not
+  // just verified ones, so the iOS app can show the full corpus during
+  // development before the curation queue catches up. Declined words are
+  // always excluded — those are explicit "doesn't belong in the game"
+  // signals and shouldn't leak even in dev mode.
+  const includeAll = request.nextUrl.searchParams.get("include") === "all";
   const rows = await prisma.word.findMany({
-    where: { verified: true, declined: false },
+    where: includeAll
+      ? { declined: false }
+      : { verified: true, declined: false },
     orderBy: { word: "asc" },
   });
 
