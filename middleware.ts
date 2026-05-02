@@ -19,6 +19,10 @@ export default auth((req) => {
   // presigned URL is itself short-lived and unguessable.
   const isWordImageApi =
     /^\/api\/words\/[^/]+\/image$/.test(pathname);
+  // Public read of the verified word catalog — the iOS app fetches this on
+  // launch to pick up newly approved words without requiring an app update.
+  // Filtered to verified + non-declined inside the handler, no PII present.
+  const isWordsExportApi = pathname === "/api/words/export";
   // Invite links are emailed to recipients who do not yet have accounts,
   // so the token page and its validation/accept APIs must be reachable
   // without a session.
@@ -56,6 +60,11 @@ export default auth((req) => {
 
   // Allow public image redirects (no auth — iOS app needs them).
   if (isWordImageApi) {
+    return NextResponse.next();
+  }
+
+  // Allow public catalog export (no auth — iOS app fetches on launch).
+  if (isWordsExportApi) {
     return NextResponse.next();
   }
 

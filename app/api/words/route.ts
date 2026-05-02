@@ -176,6 +176,10 @@ export async function POST(request: NextRequest) {
 
   const newWord = await prisma.word.create({
     data: {
+      // Override the schema's cuid default with a UUID so the iOS
+      // WordEntry decoder (UUID-typed) can consume new words via the
+      // public /api/words/export endpoint.
+      id: crypto.randomUUID(),
       word: word.toUpperCase(),
       category,
       ageGroup: age_group,

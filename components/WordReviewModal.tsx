@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Word } from "@/lib/types";
 import WordCard from "@/components/WordCard";
-import FlagDialog, { type FlagDialogResult } from "@/components/FlagDialog";
+import FlagDialog, { type FlagDialogResult, type FlagReasonKey } from "@/components/FlagDialog";
 
 type Props = {
   word: Word;
@@ -16,6 +16,9 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
   const router = useRouter();
   const [acting, setActing] = useState(false);
   const [flagTargetId, setFlagTargetId] = useState<string | null>(null);
+  const [flagInitialReasons, setFlagInitialReasons] = useState<FlagReasonKey[]>([]);
+  const [flagInitialNote, setFlagInitialNote] = useState<string>("");
+  const [flagInitialLoading, setFlagInitialLoading] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -60,18 +63,29 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
   };
 
   const handleFlag = async (id: string) => {
-    if (word.flagged) {
-      setActing(true);
-      await fetch(`/api/words/${id}/flag`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flagged: false }),
-      });
-      onWordChange({ ...word, flagged: false });
-      setActing(false);
-      return;
-    }
+    setFlagInitialReasons([]);
+    setFlagInitialNote("");
     setFlagTargetId(id);
+    if (word.flagged) {
+      setFlagInitialLoading(true);
+      try {
+        const r = await fetch(`/api/words/${id}/flag`);
+        if (r.ok) {
+          const data = await r.json();
+          if (data?.flagged) {
+            setFlagInitialReasons(
+              (data.reasons ?? []).filter(
+                (x: unknown): x is FlagReasonKey =>
+                  x === "image" || x === "word_details",
+              ),
+            );
+            setFlagInitialNote(typeof data.note === "string" ? data.note : "");
+          }
+        }
+      } finally {
+        setFlagInitialLoading(false);
+      }
+    }
   };
 
   const submitFlag = async (result: FlagDialogResult) => {
@@ -89,6 +103,20 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
       }),
     });
     onWordChange({ ...word, flagged: true });
+    setActing(false);
+  };
+
+  const unflagFromDialog = async () => {
+    const id = flagTargetId;
+    if (!id) return;
+    setFlagTargetId(null);
+    setActing(true);
+    await fetch(`/api/words/${id}/flag`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flagged: false }),
+    });
+    onWordChange({ ...word, flagged: false });
     setActing(false);
   };
 
@@ -133,7 +161,12 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
       {flagTargetId && (
         <FlagDialog
           word={word.word}
+          alreadyFlagged={word.flagged ?? false}
+          loadingExisting={flagInitialLoading}
+          initialReasons={flagInitialReasons}
+          initialNote={flagInitialNote}
           onSubmit={submitFlag}
+          onUnflag={unflagFromDialog}
           onCancel={() => setFlagTargetId(null)}
         />
       )}

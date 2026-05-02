@@ -26,7 +26,14 @@ type Props = {
   word: string;
   initialReasons?: FlagReasonKey[];
   initialNote?: string;
+  /** True when the word is already flagged — switches the dialog to "edit"
+   *  mode (different title + button labels) and enables the Remove button. */
+  alreadyFlagged?: boolean;
+  /** Shown in edit mode while we're loading the previously saved reasons/note
+   *  from the server, so the form doesn't briefly look empty. */
+  loadingExisting?: boolean;
   onSubmit: (result: FlagDialogResult) => void;
+  onUnflag?: () => void;
   onCancel: () => void;
 };
 
@@ -34,7 +41,10 @@ export default function FlagDialog({
   word,
   initialReasons = [],
   initialNote = "",
+  alreadyFlagged = false,
+  loadingExisting = false,
   onSubmit,
+  onUnflag,
   onCancel,
 }: Props) {
   const [reasons, setReasons] = useState<Set<FlagReasonKey>>(
@@ -43,6 +53,17 @@ export default function FlagDialog({
   const [note, setNote] = useState(initialNote);
   const submitRef = useRef<HTMLButtonElement>(null);
   const canSubmit = reasons.size > 0 || note.trim().length > 0;
+
+  // When existing flag details arrive after the dialog mounts (async fetch),
+  // hydrate the form. We only sync from props on initial value change so a
+  // user edit isn't clobbered by a late response.
+  useEffect(() => {
+    setReasons(new Set(initialReasons));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialReasons.join("|")]);
+  useEffect(() => {
+    setNote(initialNote);
+  }, [initialNote]);
 
   useEffect(() => {
     submitRef.current?.focus();
@@ -90,10 +111,16 @@ export default function FlagDialog({
             id="flag-dialog-title"
             className="text-lg font-semibold text-[var(--text-primary)] mb-1"
           >
-            Flag <span className="font-mono">{word}</span> for review
+            {alreadyFlagged ? "Edit flag on " : "Flag "}
+            <span className="font-mono">{word}</span>
+            {alreadyFlagged ? "" : " for review"}
           </h2>
           <p className="text-sm text-[var(--text-secondary)] mb-4">
-            What&rsquo;s off? Pick one or both, add a note if useful.
+            {alreadyFlagged
+              ? loadingExisting
+                ? "Loading what was previously flagged…"
+                : "Already flagged. Update the reasons or note, or remove the flag."
+              : "What’s off? Pick one or both, add a note if useful."}
           </p>
 
           <fieldset className="mb-4 space-y-2">
@@ -142,22 +169,36 @@ export default function FlagDialog({
           </label>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-3 bg-[var(--bg-secondary)] border-t border-[var(--border-light)]">
-          <button type="button" onClick={onCancel} className="btn btn-secondary">
-            Cancel
-          </button>
-          <button
-            ref={submitRef}
-            type="button"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="btn btn-primary"
-            title={
-              canSubmit ? undefined : "Pick at least one reason or write a note"
-            }
-          >
-            Flag word
-          </button>
+        <div className="flex justify-between gap-2 px-6 py-3 bg-[var(--bg-secondary)] border-t border-[var(--border-light)]">
+          <div>
+            {alreadyFlagged && onUnflag && (
+              <button
+                type="button"
+                onClick={onUnflag}
+                className="btn btn-secondary"
+                title="Remove the flag from this word"
+              >
+                Remove flag
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onCancel} className="btn btn-secondary">
+              Cancel
+            </button>
+            <button
+              ref={submitRef}
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="btn btn-primary"
+              title={
+                canSubmit ? undefined : "Pick at least one reason or write a note"
+              }
+            >
+              {alreadyFlagged ? "Save changes" : "Flag word"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

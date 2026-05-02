@@ -34,7 +34,8 @@ function WordsPageInner() {
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [modalWord, setModalWord] = useState<Word | null>(null);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = useState(50);
+  const pageSizeOptions = [25, 50, 100, 200, 500];
 
   const router = useRouter();
   const { status } = useSession();
@@ -64,7 +65,7 @@ function WordsPageInner() {
     }
 
     setIsLoading(false);
-  }, [status, filters, page]);
+  }, [status, filters, page, pageSize]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -76,7 +77,7 @@ function WordsPageInner() {
 
   useEffect(() => {
     setPage(0);
-  }, [filters]);
+  }, [filters, pageSize]);
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -210,27 +211,49 @@ function WordsPageInner() {
           )}
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <div className="text-sm text-[var(--text-secondary)]">
-                Page {page + 1} of {totalPages}
+          {totalCount > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
+              <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+                <label htmlFor="pageSize" className="flex items-center gap-2">
+                  Show
+                  <select
+                    id="pageSize"
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="input text-sm py-1 px-2"
+                  >
+                    {pageSizeOptions.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                  per page
+                </label>
+                {totalPages > 1 && (
+                  <span>
+                    · Page {page + 1} of {totalPages}
+                  </span>
+                )}
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage(Math.max(0, page - 1))}
-                  disabled={page === 0}
-                  className="btn btn-secondary text-sm"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="btn btn-secondary text-sm"
-                >
-                  Next
-                </button>
-              </div>
+              {totalPages > 1 && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage(Math.max(0, page - 1))}
+                    disabled={page === 0}
+                    className="btn btn-secondary text-sm"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="btn btn-secondary text-sm"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

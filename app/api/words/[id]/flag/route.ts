@@ -12,6 +12,41 @@ import { prisma } from "@/lib/prisma";
   recent row in activity_log for that word with action in ('flagged', 'unflagged')
   has action='flagged'.
 */
+
+// GET — return the most recent flag's reasons + note so the reviewer can see
+// what was previously flagged before deciding to update or remove the flag.
+// Returns { flagged: false } when the word's current state is unflagged.
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { id } = await params;
+  const latest = await prisma.activityLog.findFirst({
+    where: { wordId: id, action: { in: ["flagged", "unflagged"] } },
+    orderBy: { createdAt: "desc" },
+    select: { action: true, details: true, createdAt: true, userId: true },
+  });
+  if (!latest || latest.action !== "flagged") {
+    return NextResponse.json({ flagged: false });
+  }
+  const details = (latest.details ?? {}) as { reasons?: unknown; note?: unknown };
+  const reasons = Array.isArray(details.reasons)
+    ? details.reasons.filter((r): r is string => typeof r === "string")
+    : [];
+  const note = typeof details.note === "string" ? details.note : "";
+  return NextResponse.json({
+    flagged: true,
+    reasons,
+    note,
+    flagged_at: latest.createdAt,
+    flagged_by: latest.userId,
+  });
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

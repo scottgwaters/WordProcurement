@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import WordCard from "@/components/WordCard";
-import FlagDialog, { type FlagDialogResult } from "@/components/FlagDialog";
+import FlagDialog, { type FlagDialogResult, type FlagReasonKey } from "@/components/FlagDialog";
 import type { Word, GradeLevel } from "@/lib/types";
 import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
 import GradeBadge from "@/components/GradeBadge";
@@ -311,6 +311,11 @@ function BucketReview({
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
   const [flagTargetId, setFlagTargetId] = useState<string | null>(null);
+  // When opening the dialog on an already-flagged word, hydrate from the
+  // server so the reviewer can see / edit what was previously submitted.
+  const [flagInitialReasons, setFlagInitialReasons] = useState<FlagReasonKey[]>([]);
+  const [flagInitialNote, setFlagInitialNote] = useState<string>("");
+  const [flagInitialLoading, setFlagInitialLoading] = useState(false);
   // Default ON — once a reviewer verifies a word they usually want it gone
   // from the queue so they can power through the remaining pending pile.
   const [hideVerified, setHideVerified] = useState(true);
@@ -393,20 +398,33 @@ function BucketReview({
   const handleFlag = async (id: string) => {
     const word = words.find((w) => w.id === id);
     const alreadyFlagged = word?.flagged ?? false;
-    if (alreadyFlagged) {
-      setActingId(id);
-      await fetch(`/api/words/${id}/flag`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flagged: false }),
-      });
-      setWords((prev) =>
-        prev.map((w) => (w.id === id ? { ...w, flagged: false } : w)),
-      );
-      setActingId(null);
-      return;
-    }
+    // Always open the dialog so the reviewer can see what (if anything) was
+    // previously flagged. For already-flagged words, fetch the latest flag's
+    // reasons + note so the form reflects the existing state — otherwise the
+    // dialog opens blank and prior context is invisible.
+    setFlagInitialReasons([]);
+    setFlagInitialNote("");
     setFlagTargetId(id);
+    if (alreadyFlagged) {
+      setFlagInitialLoading(true);
+      try {
+        const r = await fetch(`/api/words/${id}/flag`);
+        if (r.ok) {
+          const data = await r.json();
+          if (data?.flagged) {
+            setFlagInitialReasons(
+              (data.reasons ?? []).filter(
+                (x: unknown): x is FlagReasonKey =>
+                  x === "image" || x === "word_details",
+              ),
+            );
+            setFlagInitialNote(typeof data.note === "string" ? data.note : "");
+          }
+        }
+      } finally {
+        setFlagInitialLoading(false);
+      }
+    }
   };
 
   const submitFlag = async (result: FlagDialogResult) => {
@@ -425,6 +443,22 @@ function BucketReview({
     });
     setWords((prev) =>
       prev.map((w) => (w.id === id ? { ...w, flagged: true } : w)),
+    );
+    setActingId(null);
+  };
+
+  const unflagFromDialog = async () => {
+    const id = flagTargetId;
+    if (!id) return;
+    setFlagTargetId(null);
+    setActingId(id);
+    await fetch(`/api/words/${id}/flag`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flagged: false }),
+    });
+    setWords((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, flagged: false } : w)),
     );
     setActingId(null);
   };
@@ -576,7 +610,14 @@ function BucketReview({
       {flagTargetId && (
         <FlagDialog
           word={words.find((w) => w.id === flagTargetId)?.word ?? "this word"}
+          alreadyFlagged={
+            words.find((w) => w.id === flagTargetId)?.flagged ?? false
+          }
+          loadingExisting={flagInitialLoading}
+          initialReasons={flagInitialReasons}
+          initialNote={flagInitialNote}
           onSubmit={submitFlag}
+          onUnflag={unflagFromDialog}
           onCancel={() => setFlagTargetId(null)}
         />
       )}
