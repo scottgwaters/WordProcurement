@@ -46,8 +46,14 @@ export default auth((req) => {
   // outside a browser session.
   if (isImportApi || isStorageTestApi || isDeclineApi || isImageWorkerApi) {
     const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-    const expected = process.env.IMPORT_API_TOKEN;
-    if (bearer && expected && bearer === expected) {
+    // Accept either token name. Two values exist on the project (one
+    // legacy, one the curator set locally); both are the same trust level
+    // — "I'm a trusted CLI/worker, not a browser session." Coalescing them
+    // here removes the silent-redirect foot-gun when the two drift.
+    const tokens = [process.env.IMPORT_API_TOKEN, process.env.WP_IMPORT_TOKEN].filter(
+      (t): t is string => typeof t === "string" && t.length > 0,
+    );
+    if (bearer && tokens.some((t) => t === bearer)) {
       return NextResponse.next();
     }
   }

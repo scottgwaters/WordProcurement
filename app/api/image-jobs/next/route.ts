@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
   const bearer = request.headers
     .get("authorization")
     ?.replace(/^Bearer\s+/i, "");
-  if (!bearer || bearer !== process.env.IMPORT_API_TOKEN) {
+  const tokens = [process.env.IMPORT_API_TOKEN, process.env.WP_IMPORT_TOKEN].filter(
+    (t): t is string => typeof t === "string" && t.length > 0,
+  );
+  if (!bearer || !tokens.some((t) => t === bearer)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
