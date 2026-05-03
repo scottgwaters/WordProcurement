@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search");
   const excludeLeased = searchParams.get("excludeLeased") === "1";
   const page = parseInt(searchParams.get("page") || "0");
-  const pageSize = parseInt(searchParams.get("pageSize") || "50");
+  const pageSizeParam = searchParams.get("pageSize") || "50";
+  const showAll = pageSizeParam === "all";
+  const pageSize = showAll ? 0 : parseInt(pageSizeParam);
 
   // Flag state is derived from activity_log, not a column. Build a map of
   // wordId → flagged (boolean) by scanning the flag/unflag history newest
@@ -101,8 +103,7 @@ export async function GET(request: NextRequest) {
     prisma.word.findMany({
       where,
       orderBy: { word: "asc" },
-      skip: page * pageSize,
-      take: pageSize,
+      ...(showAll ? {} : { skip: page * pageSize, take: pageSize }),
     }),
     prisma.word.count({ where }),
   ]);

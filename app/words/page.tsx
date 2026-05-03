@@ -34,8 +34,8 @@ function WordsPageInner() {
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [modalWord, setModalWord] = useState<Word | null>(null);
-  const [pageSize, setPageSize] = useState(50);
-  const pageSizeOptions = [25, 50, 100, 200, 500];
+  const [pageSize, setPageSize] = useState<number | "all">(50);
+  const pageSizeOptions: (number | "all")[] = [25, 50, 100, 200, 500, "all"];
 
   const router = useRouter();
   const { status } = useSession();
@@ -79,7 +79,7 @@ function WordsPageInner() {
     setPage(0);
   }, [filters, pageSize]);
 
-  const totalPages = Math.ceil(totalCount / pageSize);
+  const totalPages = pageSize === "all" ? 1 : Math.ceil(totalCount / pageSize);
 
   if (status === "loading") {
     return (
@@ -109,8 +109,27 @@ function WordsPageInner() {
               Browse and manage all words in the database
             </p>
           </div>
-          <div className="text-sm text-[var(--text-secondary)]">
-            {totalCount.toLocaleString()} words
+          <div className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
+            <span>{totalCount.toLocaleString()} words</span>
+            <label htmlFor="pageSize" className="flex items-center gap-2">
+              Show
+              <select
+                id="pageSize"
+                value={String(pageSize)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPageSize(v === "all" ? "all" : Number(v));
+                }}
+                className="input text-sm py-1 px-2"
+              >
+                {pageSizeOptions.map((size) => (
+                  <option key={String(size)} value={String(size)}>
+                    {size === "all" ? "All" : size}
+                  </option>
+                ))}
+              </select>
+              per page
+            </label>
           </div>
         </div>
 
@@ -211,49 +230,27 @@ function WordsPageInner() {
           )}
 
           {/* Pagination */}
-          {totalCount > 0 && (
+          {totalCount > 0 && totalPages > 1 && (
             <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
-              <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
-                <label htmlFor="pageSize" className="flex items-center gap-2">
-                  Show
-                  <select
-                    id="pageSize"
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="input text-sm py-1 px-2"
-                  >
-                    {pageSizeOptions.map((size) => (
-                      <option key={size} value={size}>
-                        {size}
-                      </option>
-                    ))}
-                  </select>
-                  per page
-                </label>
-                {totalPages > 1 && (
-                  <span>
-                    · Page {page + 1} of {totalPages}
-                  </span>
-                )}
+              <div className="text-sm text-[var(--text-secondary)]">
+                Page {page + 1} of {totalPages}
               </div>
-              {totalPages > 1 && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage(Math.max(0, page - 1))}
-                    disabled={page === 0}
-                    className="btn btn-secondary text-sm"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                    disabled={page >= totalPages - 1}
-                    className="btn btn-secondary text-sm"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage(Math.max(0, page - 1))}
+                  disabled={page === 0}
+                  className="btn btn-secondary text-sm"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="btn btn-secondary text-sm"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>
