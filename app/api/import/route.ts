@@ -29,8 +29,13 @@ interface WordEntry {
 
 export async function POST(request: NextRequest) {
   const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const expectedToken = process.env.IMPORT_API_TOKEN;
-  const tokenOk = !!expectedToken && !!bearer && bearer === expectedToken;
+  // Mirror middleware.ts: accept either IMPORT_API_TOKEN or WP_IMPORT_TOKEN.
+  // Both names are valid bearer tokens; checking only one created a silent-401
+  // when the curator's local WP_IMPORT_TOKEN matched the server's WP_IMPORT_TOKEN
+  // but not its IMPORT_API_TOKEN.
+  const expectedTokens = [process.env.IMPORT_API_TOKEN, process.env.WP_IMPORT_TOKEN]
+    .filter((t): t is string => typeof t === "string" && t.length > 0);
+  const tokenOk = !!bearer && expectedTokens.some((t) => t === bearer);
 
   if (!tokenOk) {
     const session = await auth();
