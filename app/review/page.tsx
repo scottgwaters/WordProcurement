@@ -115,9 +115,9 @@ function BucketPicker() {
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <header className="mb-10">
-          <h1 className="text-4xl font-semibold tracking-tight text-[var(--text-primary)]">
+      <main className="page-container" style={{ maxWidth: "1280px" }}>
+        <header className="mb-6 sm:mb-10">
+          <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-[var(--text-primary)]">
             Pick a Review Bucket
           </h1>
           <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-2xl">

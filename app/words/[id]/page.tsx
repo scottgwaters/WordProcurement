@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback, useRef, use } from "react";
 import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import type { Word, AgeGroup, GradeLevel, Level, ActivityLogWithUser } from "@/lib/types";
@@ -11,6 +11,48 @@ import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/l
 import { useDialog } from "@/components/Dialog";
 import ImageGeneratePanel from "@/components/ImageGeneratePanel";
 import WordReviewModal from "@/components/WordReviewModal";
+
+// Editable form shape — kept at module scope so the autosave snapshot helper
+// can live outside the component (no closure-over-state, no stale-deps warnings).
+type FormData = {
+  word: string;
+  category: string;
+  age_group: AgeGroup;
+  grade_level: GradeLevel;
+  level: Level;
+  hints_easy: string;
+  hints_medium: string;
+  hints_hard: string;
+  definition: string;
+  example_sentence: string;
+  part_of_speech: string;
+  pronunciation: string;
+  pronunciation_arpabet: string;
+  pronunciation_respelling: string;
+  heart_word_explanation: string;
+};
+
+// Stable JSON snapshot used as the autosave dirty check. Pure of any
+// component state so it doesn't recreate on every render.
+function buildSnapshot(data: FormData): string {
+  return JSON.stringify({
+    word: data.word.toUpperCase(),
+    category: data.category,
+    age_group: data.age_group,
+    grade_level: data.grade_level,
+    level: data.level,
+    hints_easy: data.hints_easy,
+    hints_medium: data.hints_medium,
+    hints_hard: data.hints_hard,
+    definition: data.definition,
+    example_sentence: data.example_sentence,
+    part_of_speech: data.part_of_speech,
+    pronunciation: data.pronunciation,
+    pronunciation_arpabet: data.pronunciation_arpabet,
+    pronunciation_respelling: data.pronunciation_respelling,
+    heart_word_explanation: data.heart_word_explanation,
+  });
+}
 
 export default function WordDetailPage({
   params,
@@ -37,12 +79,18 @@ export default function WordDetailPage({
   const backLabel = from === "review" ? "Back to review" : "Back to words";
   const [word, setWord] = useState<Word | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityLogWithUser[]>([]);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  // Autosave status: 'idle' before any edits, 'saving' while a PATCH is in
+  // flight, 'saved' once the latest changes are persisted, 'error' if the
+  // last save attempt failed (network or 409). Drives the corner indicator
+  // and the sticky bottom save bar.
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Cross-tier duplicates for this word's spelling (case-insensitive).
   // Populated after the word loads so the reviewer can spot e.g. "DRAGON
   // already lives in 10-12 / magic" before verifying a new copy.
@@ -69,12 +117,12 @@ export default function WordDetailPage({
   } | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     word: "",
     category: "",
-    age_group: "4-6" as AgeGroup,
-    grade_level: "k" as GradeLevel,
-    level: 1 as Level,
+    age_group: "4-6",
+    grade_level: "k",
+    level: 1,
     hints_easy: "",
     hints_medium: "",
     hints_hard: "",
@@ -89,6 +137,18 @@ export default function WordDetailPage({
   // Version token read from the server on load; echoed on PATCH so the
   // server can reject our write if someone else saved first.
   const [version, setVersion] = useState<number>(0);
+
+  // ---- Autosave plumbing ---------------------------------------------------
+  // Refs mirror the pieces of state that the autosave closure needs to read
+  // without forcing it to be recreated on every keystroke. The debounce timer
+  // schedules a PATCH 800 ms after the user stops typing; an in-flight guard
+  // serializes saves so two PATCHes can't race on the same row.
+  const formDataRef = useRef(formData);
+  const versionRef = useRef(version);
+  const lockedRef = useRef(false);
+  const lastSavedSnapshotRef = useRef<string>("");
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingRef = useRef(false);
 
   const router = useRouter();
   const { status } = useSession();
@@ -117,7 +177,7 @@ export default function WordDetailPage({
 
     const data = await response.json();
     setWord(data);
-    setFormData({
+    const nextForm = {
       word: data.word,
       category: data.category,
       age_group: data.age_group,
@@ -133,8 +193,17 @@ export default function WordDetailPage({
       pronunciation_arpabet: data.pronunciation_arpabet || "",
       pronunciation_respelling: data.pronunciation_respelling || "",
       heart_word_explanation: data.heart_word_explanation || "",
-    });
-    setVersion(typeof data.version === "number" ? data.version : 0);
+    };
+    setFormData(nextForm);
+    const nextVersion = typeof data.version === "number" ? data.version : 0;
+    setVersion(nextVersion);
+    // Seed the autosave dirty baseline so loading the word doesn't
+    // immediately trip an autosave on next render.
+    lastSavedSnapshotRef.current = buildSnapshot(nextForm);
+    formDataRef.current = nextForm;
+    versionRef.current = nextVersion;
+    setSaveStatus("idle");
+    setSaveError(null);
 
     setIsLoading(false);
     fetchActivity();
@@ -215,56 +284,148 @@ export default function WordDetailPage({
     };
   }, [status, resolvedParams.id]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setError(null);
-    setSuccess(null);
+  // Single source of truth for "send the current form to the server". Used
+  // by both the debounced autosave and explicit triggers (force-save after
+  // a 409 conflict, beforeunload flush). Skips when locked or when nothing
+  // has changed since the last successful save.
+  const performSave = useCallback(async () => {
+    if (savingRef.current) return;
+    if (lockedRef.current) return;
 
-    const updateData = {
-      word: formData.word.toUpperCase(),
-      category: formData.category,
-      age_group: formData.age_group,
-      grade_level: formData.grade_level,
-      level: formData.level,
-      hints: {
-        easy: formData.hints_easy,
-        medium: formData.hints_medium,
-        hard: formData.hints_hard,
-      },
-      definition: formData.definition || null,
-      example_sentence: formData.example_sentence || null,
-      part_of_speech: formData.part_of_speech || null,
-      pronunciation: formData.pronunciation || null,
-      pronunciation_arpabet: formData.pronunciation_arpabet || null,
-      pronunciation_respelling: formData.pronunciation_respelling || null,
-      heart_word_explanation: formData.heart_word_explanation || null,
-      // Optimistic concurrency token — if the server moved past this
-      // version, it returns 409 instead of overwriting.
-      version,
-    };
-
-    const response = await fetch(`/api/words/${resolvedParams.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updateData),
-    });
-
-    if (response.status === 409) {
-      const data = await response.json().catch(() => ({}));
-      setSaveConflict({
-        currentVersion:
-          typeof data.currentVersion === "number" ? data.currentVersion : version,
-      });
-    } else if (!response.ok) {
-      setError("Failed to save changes");
-    } else {
-      setSuccess("Changes saved successfully");
-      setSaveConflict(null);
-      fetchWord();
+    const fd = formDataRef.current;
+    const snapshot = buildSnapshot(fd);
+    if (snapshot === lastSavedSnapshotRef.current) {
+      // Nothing to do — caller might still want to show "Saved" so we
+      // don't clobber any in-flight indicator state.
+      return;
     }
 
-    setIsSaving(false);
-  };
+    savingRef.current = true;
+    setSaveStatus("saving");
+    setSaveError(null);
+
+    const updateData = {
+      word: fd.word.toUpperCase(),
+      category: fd.category,
+      age_group: fd.age_group,
+      grade_level: fd.grade_level,
+      level: fd.level,
+      hints: {
+        easy: fd.hints_easy,
+        medium: fd.hints_medium,
+        hard: fd.hints_hard,
+      },
+      definition: fd.definition || null,
+      example_sentence: fd.example_sentence || null,
+      part_of_speech: fd.part_of_speech || null,
+      pronunciation: fd.pronunciation || null,
+      pronunciation_arpabet: fd.pronunciation_arpabet || null,
+      pronunciation_respelling: fd.pronunciation_respelling || null,
+      heart_word_explanation: fd.heart_word_explanation || null,
+      // Optimistic concurrency token — if the server moved past this
+      // version, it returns 409 instead of overwriting.
+      version: versionRef.current,
+    };
+
+    let nextStatus: "saved" | "error" = "saved";
+    try {
+      const response = await fetch(`/api/words/${resolvedParams.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+        // keepalive lets a save survive an in-flight navigation away from
+        // the page so the last keystrokes aren't lost when the user taps
+        // Back mid-edit.
+        keepalive: true,
+      });
+      if (response.status === 409) {
+        const data = await response.json().catch(() => ({}));
+        setSaveConflict({
+          currentVersion:
+            typeof data.currentVersion === "number"
+              ? data.currentVersion
+              : versionRef.current,
+        });
+        nextStatus = "error";
+        setSaveError("Another reviewer saved changes — see banner above.");
+      } else if (!response.ok) {
+        nextStatus = "error";
+        setSaveError("Save failed — we'll retry on your next change.");
+      } else {
+        const data = await response.json().catch(() => null);
+        if (data && typeof data.version === "number") {
+          setVersion(data.version);
+          versionRef.current = data.version;
+        }
+        lastSavedSnapshotRef.current = snapshot;
+        // Refresh activity log in the background so the change shows up
+        // without forcing a full page reload.
+        fetchActivity();
+      }
+    } catch {
+      nextStatus = "error";
+      setSaveError("Network error — we'll retry on your next change.");
+    } finally {
+      savingRef.current = false;
+      setSaveStatus(nextStatus);
+      // If the user kept typing during the save, schedule another
+      // immediately so the latest text still gets persisted.
+      if (
+        nextStatus === "saved" &&
+        buildSnapshot(formDataRef.current) !== lastSavedSnapshotRef.current
+      ) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => performSave(), 400);
+      }
+    }
+  }, [resolvedParams.id, fetchActivity]);
+
+  // Mirror state into refs so performSave's closure stays stable.
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
+  useEffect(() => {
+    versionRef.current = version;
+  }, [version]);
+  useEffect(() => {
+    lockedRef.current = !!lockedBy || !!saveConflict;
+  }, [lockedBy, saveConflict]);
+
+  // Debounced autosave: any time formData changes, schedule a save 800 ms
+  // after the last edit. The empty-snapshot guard skips saves when the form
+  // hasn't moved away from the last successfully-saved state.
+  useEffect(() => {
+    if (status !== "authenticated" || !word) return;
+    if (lockedBy || saveConflict) return;
+    if (buildSnapshot(formData) === lastSavedSnapshotRef.current) return;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => performSave(), 800);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [formData, status, word, lockedBy, saveConflict, performSave]);
+
+  // Best-effort flush when the tab is hidden or the page is being closed,
+  // so the last few keystrokes aren't dropped on the way out. fetch() with
+  // keepalive lets the request finish after the document is gone.
+  useEffect(() => {
+    const onPageHide = () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      if (
+        !lockedRef.current &&
+        buildSnapshot(formDataRef.current) !== lastSavedSnapshotRef.current
+      ) {
+        // Fire and forget — we can't await inside pagehide.
+        void performSave();
+      }
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [performSave]);
 
   // Hard delete — for unambiguous mistakes (duplicate rows for the same
   // spelling at the same grade, junk seeds). Two-step: typed-confirm prompt
@@ -303,7 +464,6 @@ export default function WordDetailPage({
       body: JSON.stringify({ declined: false }),
     });
     if (res.ok) {
-      setSuccess("Word restored to pending");
       await fetchWord();
     } else {
       setError("Couldn't un-decline this word");
@@ -321,10 +481,16 @@ export default function WordDetailPage({
   // Keep the current edits but bump our version token to the server's
   // latest so the next save goes through. Used when the reviewer has
   // reviewed the remote changes and wants to proceed with their edit anyway.
+  // After clearing the conflict, kick off an immediate save so the local
+  // edits land without waiting for another keystroke.
   const handleForceSave = () => {
     if (saveConflict) {
-      setVersion(saveConflict.currentVersion);
+      const target = saveConflict.currentVersion;
+      setVersion(target);
+      versionRef.current = target;
       setSaveConflict(null);
+      // Schedule a save on the next tick so the lockedRef has cleared.
+      setTimeout(() => performSave(), 0);
     }
   };
 
@@ -332,7 +498,7 @@ export default function WordDetailPage({
     return (
       <div className="min-h-screen">
         <Header />
-        <main className="max-w-4xl mx-auto px-6 py-8">
+        <main className="page-container max-w-4xl">
           <div className="card p-12 text-center">
             <div className="spinner mx-auto mb-4" />
             <p className="text-[var(--text-secondary)]">Loading word...</p>
@@ -346,7 +512,7 @@ export default function WordDetailPage({
     return (
       <div className="min-h-screen">
         <Header />
-        <main className="max-w-4xl mx-auto px-6 py-8">
+        <main className="page-container max-w-4xl">
           <div className="card p-12 text-center">
             <p className="text-[var(--text-secondary)]">Word not found</p>
             <Link href={backHref} className="btn btn-primary mt-4">
@@ -359,55 +525,57 @@ export default function WordDetailPage({
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen edit-page">
       <Header />
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <div className="flex items-center gap-4 mb-6">
-          <Link
-            href={backHref}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
+      <main className="page-container max-w-4xl">
+        <div className="edit-page__topbar">
+          <Link href={backHref} className="edit-page__back">
             ← {backLabel}
           </Link>
-          <div className="flex-1">
-            <h1 className="text-3xl font-semibold text-[var(--text-primary)] uppercase tracking-wide">
-              {word.word}
-            </h1>
-            <div className="flex items-center gap-2 mt-1">
-              {word.declined ? (
-                <span className="badge badge-error">Declined</span>
-              ) : word.verified ? (
-                <span className="badge badge-success">Verified</span>
-              ) : (
-                <span className="badge badge-warning">Pending</span>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowReview(true)}
-                className="badge badge-neutral hover:bg-[var(--bg-secondary)] cursor-pointer"
-                title="Open the review card view for this word"
-              >
-                👁 Show review view
-              </button>
-              {(() => {
-                const a = worldForCategory(word.category);
-                return a.world ? (
-                  <span
-                    className="badge badge-neutral"
-                    title={`${a.world.tagline}\n\n${a.world.description}`}
-                  >
-                    {a.world.emoji} {a.world.name}
-                  </span>
-                ) : (
-                  <span className="badge badge-warning" title={a.note}>
-                    ⚠ World: Mixed
-                  </span>
-                );
-              })()}
-            </div>
-          </div>
+          <SaveStatusBadge
+            status={saveStatus}
+            error={saveError}
+            locked={!!lockedBy}
+            conflict={!!saveConflict}
+          />
         </div>
+
+        <header className="mb-6">
+          <h1 className="edit-page__title">{word.word}</h1>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {word.declined ? (
+              <span className="badge badge-error">Declined</span>
+            ) : word.verified ? (
+              <span className="badge badge-success">Verified</span>
+            ) : (
+              <span className="badge badge-warning">Pending</span>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowReview(true)}
+              className="badge badge-neutral hover:bg-[var(--bg-secondary)] cursor-pointer"
+              title="Open the review card view for this word"
+            >
+              👁 Show review view
+            </button>
+            {(() => {
+              const a = worldForCategory(word.category);
+              return a.world ? (
+                <span
+                  className="badge badge-neutral"
+                  title={`${a.world.tagline}\n\n${a.world.description}`}
+                >
+                  {a.world.emoji} {a.world.name}
+                </span>
+              ) : (
+                <span className="badge badge-warning" title={a.note}>
+                  ⚠ World: Mixed
+                </span>
+              );
+            })()}
+          </div>
+        </header>
 
         {duplicates.length > 0 && (() => {
           // Split declined out so reviewers don't mistake a declined ghost
@@ -416,7 +584,7 @@ export default function WordDetailPage({
           const declinedDupes = duplicates.filter((d) => d.declined);
           return (
             <div className="bg-[var(--warning-bg)] border border-[var(--warning)] px-4 py-3 rounded-lg mb-6 text-sm">
-              <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 mb-2">
                 <div className="font-medium text-[var(--warning)]">
                   {live.length > 0
                     ? "This spelling already exists elsewhere"
@@ -425,7 +593,7 @@ export default function WordDetailPage({
                 {live.length > 0 && (
                   <Link
                     href={`/words/group/${encodeURIComponent(formData.word)}?from=${from ?? "words"}`}
-                    className="btn btn-secondary text-xs whitespace-nowrap"
+                    className="btn btn-secondary text-xs whitespace-nowrap self-start"
                   >
                     Edit all variants together →
                   </Link>
@@ -437,7 +605,7 @@ export default function WordDetailPage({
                   return (
                     <li
                       key={d.id}
-                      className={`flex items-center gap-2 ${d.declined ? "opacity-60" : ""}`}
+                      className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${d.declined ? "opacity-60" : ""}`}
                     >
                       <Link
                         href={`/words/${d.id}?from=${from ?? "words"}`}
@@ -484,12 +652,6 @@ export default function WordDetailPage({
           </div>
         )}
 
-        {success && (
-          <div className="bg-[var(--success-bg)] text-[var(--success)] px-4 py-3 rounded-lg mb-6 text-sm">
-            {success}
-          </div>
-        )}
-
         {lockedBy && (
           <div className="bg-[var(--warning-bg)] text-[var(--text-primary)] border border-[var(--warning)] px-4 py-3 rounded-lg mb-6 text-sm">
             <span className="font-medium text-[var(--warning)]">
@@ -501,7 +663,7 @@ export default function WordDetailPage({
         )}
 
         {word.declined && (
-          <div className="flex items-start justify-between gap-3 bg-[var(--error-bg)] text-[var(--text-primary)] border border-[var(--error)] px-4 py-3 rounded-lg mb-6 text-sm">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-[var(--error-bg)] text-[var(--text-primary)] border border-[var(--error)] px-4 py-3 rounded-lg mb-6 text-sm">
             <div>
               <div className="font-medium text-[var(--error)] mb-1">
                 This word is declined
@@ -514,7 +676,7 @@ export default function WordDetailPage({
             <button
               type="button"
               onClick={handleUndecline}
-              className="btn btn-secondary text-xs whitespace-nowrap"
+              className="btn btn-secondary text-xs whitespace-nowrap self-start"
             >
               Un-decline
             </button>
@@ -529,7 +691,7 @@ export default function WordDetailPage({
             <p className="text-[var(--text-secondary)] mb-3">
               To avoid overwriting their work, pick one:
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
                 onClick={handleDiscardAndReload}
@@ -554,7 +716,7 @@ export default function WordDetailPage({
             {/* Basic info */}
             <div className="card p-6">
               <h2 className="text-lg font-semibold mb-4">Basic Information</h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                     Word
@@ -846,34 +1008,27 @@ export default function WordDetailPage({
 
             <ImageGeneratePanel wordId={resolvedParams.id} />
 
-            {/* Save button */}
-            <button
-              onClick={handleSave}
-              disabled={isSaving || !!lockedBy}
-              title={lockedBy ? `${lockedBy} is editing this word` : undefined}
-              className="btn btn-success w-full"
-            >
-              {isSaving ? (
-                <>
-                  <span className="spinner" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </button>
-
             {/* Delete (hard) — for unambiguous mistakes only. Decline is the
                 better choice for "this word doesn't belong" since it preserves
-                the audit trail and survives re-imports. */}
-            <button
-              onClick={handleDelete}
-              disabled={!!lockedBy}
-              title={lockedBy ? `${lockedBy} is editing this word` : "Permanently delete this word"}
-              className="btn btn-danger text-sm"
-            >
-              Delete word permanently
-            </button>
+                the audit trail and survives re-imports. Tucked at the bottom
+                of the form behind a typed-confirm prompt so it doesn't sit
+                next to autosaved fields where a misclick would be costly. */}
+            <div className="card p-6">
+              <h2 className="text-lg font-semibold mb-1">Danger zone</h2>
+              <p className="text-sm text-[var(--text-secondary)] mb-3">
+                Decline is the right call for &ldquo;this word doesn&rsquo;t belong.&rdquo;
+                Delete is for duplicate rows or junk seeds — it removes the row
+                entirely with no audit trail.
+              </p>
+              <button
+                onClick={handleDelete}
+                disabled={!!lockedBy}
+                title={lockedBy ? `${lockedBy} is editing this word` : "Permanently delete this word"}
+                className="btn btn-danger text-sm"
+              >
+                Delete word permanently
+              </button>
+            </div>
 
             {/* Activity History */}
             <div className="card">
@@ -965,6 +1120,76 @@ export default function WordDetailPage({
         />
       )}
     </div>
+  );
+}
+
+// Compact status pill that lives in the page topbar next to the back link.
+// Communicates autosave state at a glance: idle ("All changes saved" once
+// the form has actually been touched), saving (spinner), saved (checkmark),
+// error (red text). Locked / conflict states take precedence so the reviewer
+// understands why typing isn't producing a save.
+function SaveStatusBadge({
+  status,
+  error,
+  locked,
+  conflict,
+}: {
+  status: "idle" | "saving" | "saved" | "error";
+  error: string | null;
+  locked: boolean;
+  conflict: boolean;
+}) {
+  if (locked) {
+    return (
+      <span className="save-status save-status--locked" role="status">
+        <span className="save-status__dot" aria-hidden />
+        Locked — saves blocked
+      </span>
+    );
+  }
+  if (conflict) {
+    return (
+      <span className="save-status save-status--error" role="status">
+        <span className="save-status__dot" aria-hidden />
+        Conflict — see banner
+      </span>
+    );
+  }
+  if (status === "saving") {
+    return (
+      <span className="save-status save-status--saving" role="status" aria-live="polite">
+        <span className="spinner" aria-hidden />
+        Saving…
+      </span>
+    );
+  }
+  if (status === "error") {
+    return (
+      <span
+        className="save-status save-status--error"
+        role="status"
+        aria-live="assertive"
+        title={error ?? undefined}
+      >
+        <span className="save-status__dot" aria-hidden />
+        Save failed
+      </span>
+    );
+  }
+  if (status === "saved") {
+    return (
+      <span className="save-status save-status--saved" role="status" aria-live="polite">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        Saved
+      </span>
+    );
+  }
+  return (
+    <span className="save-status save-status--idle" role="status">
+      Autosave on
+    </span>
   );
 }
 

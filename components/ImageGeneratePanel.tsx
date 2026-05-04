@@ -104,12 +104,12 @@ export default function ImageGeneratePanel({ wordId }: { wordId: string }) {
         the new PNG when it&apos;s done. You&apos;ll get a notification.
       </p>
 
-      <div className="grid grid-cols-[160px_1fr] gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-4 mb-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={`/api/words/${wordId}/image?v=${imageVersion}`}
           alt="Current word illustration"
-          className="w-40 h-40 object-cover rounded-md border border-[var(--border)] bg-[var(--bg-secondary)]"
+          className="w-40 h-40 object-cover rounded-md border border-[var(--border)] bg-[var(--bg-secondary)] justify-self-start"
           onError={(e) => {
             // Hide broken-image icon when no PNG exists yet.
             (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
