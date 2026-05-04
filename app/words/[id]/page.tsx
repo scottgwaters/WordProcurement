@@ -10,6 +10,7 @@ import Link from "next/link";
 import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 import { useDialog } from "@/components/Dialog";
 import ImageGeneratePanel from "@/components/ImageGeneratePanel";
+import WordReviewModal from "@/components/WordReviewModal";
 
 export default function WordDetailPage({
   params,
@@ -41,6 +42,7 @@ export default function WordDetailPage({
   const [success, setSuccess] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityLogWithUser[]>([]);
   const [activityExpanded, setActivityExpanded] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   // Cross-tier duplicates for this word's spelling (case-insensitive).
   // Populated after the word loads so the reviewer can spot e.g. "DRAGON
   // already lives in 10-12 / magic" before verifying a new copy.
@@ -380,6 +382,14 @@ export default function WordDetailPage({
               ) : (
                 <span className="badge badge-warning">Pending</span>
               )}
+              <button
+                type="button"
+                onClick={() => setShowReview(true)}
+                className="badge badge-neutral hover:bg-[var(--bg-secondary)] cursor-pointer"
+                title="Open the review card view for this word"
+              >
+                👁 Show review view
+              </button>
               {(() => {
                 const a = worldForCategory(word.category);
                 return a.world ? (
@@ -841,7 +851,7 @@ export default function WordDetailPage({
               onClick={handleSave}
               disabled={isSaving || !!lockedBy}
               title={lockedBy ? `${lockedBy} is editing this word` : undefined}
-              className="btn btn-primary w-full"
+              className="btn btn-success w-full"
             >
               {isSaving ? (
                 <>
@@ -947,6 +957,13 @@ export default function WordDetailPage({
 
         </div>
       </main>
+      {showReview && word && (
+        <WordReviewModal
+          word={word}
+          onClose={() => setShowReview(false)}
+          onWordChange={(updated) => setWord(updated)}
+        />
+      )}
     </div>
   );
 }

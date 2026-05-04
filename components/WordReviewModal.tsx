@@ -42,6 +42,8 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
     });
     if (r.ok) {
       onWordChange({ ...word, verified: true, declined: false });
+      onClose();
+      return;
     }
     setActing(false);
   };
@@ -139,7 +141,7 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-3 right-3 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-fast"
+            className="absolute -top-3 -right-3 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border)] shadow-sm text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-fast"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <line x1="18" y1="6" x2="6" y2="18" />

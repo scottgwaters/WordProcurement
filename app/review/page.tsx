@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import WordCard from "@/components/WordCard";
 import FlagDialog, { type FlagDialogResult, type FlagReasonKey } from "@/components/FlagDialog";
+import ImageGenerateModal from "@/components/ImageGenerateModal";
 import type { Word, GradeLevel } from "@/lib/types";
 import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
 import GradeBadge from "@/components/GradeBadge";
@@ -322,6 +323,7 @@ function BucketReview({
   // Default ON — flagged words are parked for someone else to look at, so
   // they shouldn't clutter the regular review pile.
   const [hideFlagged, setHideFlagged] = useState(true);
+  const [imageTargetId, setImageTargetId] = useState<string | null>(null);
 
   const worldMeta = WORLDS[world];
 
@@ -601,6 +603,7 @@ function BucketReview({
                 onReject={handleReject}
                 onEdit={handleEdit}
                 onFlag={handleFlag}
+                onGenerateImage={(id) => setImageTargetId(id)}
                 isLoading={actingId === w.id}
               />
             ))}
@@ -619,6 +622,13 @@ function BucketReview({
           onSubmit={submitFlag}
           onUnflag={unflagFromDialog}
           onCancel={() => setFlagTargetId(null)}
+        />
+      )}
+      {imageTargetId && (
+        <ImageGenerateModal
+          wordId={imageTargetId}
+          word={words.find((w) => w.id === imageTargetId)?.word ?? "this word"}
+          onClose={() => setImageTargetId(null)}
         />
       )}
     </div>

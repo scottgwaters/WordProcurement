@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { invalidatePresignCache, imageKeyForWord } from "@/lib/dailey-storage";
+import { worldForCategory } from "@/lib/worlds";
 
 // POST /api/image-jobs/[id]/complete
 //
@@ -34,11 +35,31 @@ export async function POST(
 
   const job = await prisma.imageJob.findUnique({
     where: { id },
-    include: { word: { select: { id: true, word: true, category: true } } },
+    include: {
+      word: {
+        select: { id: true, word: true, category: true, gradeLevel: true },
+      },
+    },
   });
   if (!job) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
+
+  // Send the curator back to the bucket review (filtered by the word's grade
+  // + world) instead of the edit form, so they land on the review card with
+  // the new image rather than the editor.
+  const worldId = worldForCategory(job.word.category).world?.id;
+  const reviewParams = new URLSearchParams();
+  if (worldId) reviewParams.set("world", worldId);
+  if (job.word.gradeLevel) {
+    reviewParams.set("gradeLevel", job.word.gradeLevel);
+  } else {
+    reviewParams.set("ungraded", "true");
+  }
+  const notificationLink =
+    worldId && reviewParams.toString()
+      ? `/review?${reviewParams.toString()}`
+      : `/words/${job.wordId}`;
 
   if (ok) {
     const finalPrompt =
@@ -69,7 +90,7 @@ export async function POST(
         userId: job.requestedById,
         kind: "image_done",
         message: `Image ready for ${job.word.word}`,
-        link: `/words/${job.wordId}`,
+        link: notificationLink,
       },
     });
   } else {
@@ -88,7 +109,7 @@ export async function POST(
         userId: job.requestedById,
         kind: "image_failed",
         message: `Image generation failed for ${job.word.word}: ${errorMessage.slice(0, 200)}`,
-        link: `/words/${job.wordId}`,
+        link: notificationLink,
       },
     });
   }
