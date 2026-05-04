@@ -1221,11 +1221,18 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   flex-shrink: 0;
 }
 
-/* Hamburger button — shown on mobile only */
-.app-header__menu-btn {
+/* Mobile tail — bell + hamburger sit at the right edge on phones so the
+   notifications bell stays reachable when .app-header__user is hidden. */
+.app-header__mobile-tail {
   display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header__menu-btn {
   width: 44px;
   height: 44px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
@@ -1348,14 +1355,23 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   .app-header__avatar { display: inline-flex; }
 }
 
-/* Mobile — swap nav for hamburger drawer */
+/* Mobile — swap nav for hamburger drawer; surface the notifications bell
+   in the mobile tail so unread alerts stay reachable. */
 @media (max-width: 767px) {
   .app-header__nav,
   .app-header__user {
     display: none;
   }
-  .app-header__menu-btn {
+  .app-header__mobile-tail {
     display: inline-flex;
+  }
+}
+
+/* Above mobile, the bell already lives in .app-header__user, so suppress
+   the mobile-tail copy to avoid two bells side by side. */
+@media (min-width: 768px) {
+  .app-header__mobile-tail {
+    display: none !important;
   }
 }
 

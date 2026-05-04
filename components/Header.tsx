@@ -101,30 +101,37 @@ export default function Header() {
             )}
           </div>
 
-          <button
-            type="button"
-            className="app-header__menu-btn"
-            aria-label="Open menu"
-            aria-expanded={drawerOpen}
-            aria-controls="app-drawer"
-            onClick={() => setDrawerOpen(true)}
-          >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
+          {/* Mobile-only header tail: notifications bell stays reachable, then
+              the hamburger opens the nav drawer. The desktop bell lives in
+              .app-header__user above; CSS toggles which one is visible. */}
+          <div className="app-header__mobile-tail">
+            {session?.user && <NotificationsBell />}
+            <button
+              type="button"
+              className="app-header__menu-btn"
+              aria-label="Open menu"
+              aria-expanded={drawerOpen}
+              aria-controls="app-drawer"
+              onClick={() => setDrawerOpen(true)}
             >
-              <line x1="4" y1="7" x2="20" y2="7" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="17" x2="20" y2="17" />
-            </svg>
-          </button>
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <line x1="4" y1="7" x2="20" y2="7" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="17" x2="20" y2="17" />
+              </svg>
+            </button>
+          </div>
+
         </div>
       </header>
 
