@@ -10,6 +10,7 @@ import Link from "next/link";
 import { worldForCategory, WORLDS, CATEGORIES_BY_WORLD, type WorldId } from "@/lib/worlds";
 import { useDialog } from "@/components/Dialog";
 import ImageGeneratePanel from "@/components/ImageGeneratePanel";
+import AudioPanel from "@/components/AudioPanel";
 import WordReviewModal from "@/components/WordReviewModal";
 
 // Editable form shape — kept at module scope so the autosave snapshot helper
@@ -546,10 +547,21 @@ export default function WordDetailPage({
           <div className="flex flex-wrap items-center gap-2 mt-2">
             {word.declined ? (
               <span className="badge badge-error">Declined</span>
-            ) : word.verified ? (
-              <span className="badge badge-success">Verified</span>
             ) : (
-              <span className="badge badge-warning">Pending</span>
+              <>
+                <span
+                  className={word.verified ? "badge badge-success" : "badge badge-warning"}
+                  title="Definition, hints, sentence, pronunciation, and image"
+                >
+                  {word.verified ? "Text Verified" : "Text Pending"}
+                </span>
+                <span
+                  className={word.audio_verified ? "badge badge-success" : "badge badge-warning"}
+                  title="Per-word .wav clip"
+                >
+                  {word.audio_verified ? "Audio Verified" : "Audio Pending"}
+                </span>
+              </>
             )}
             <button
               type="button"
@@ -1007,6 +1019,16 @@ export default function WordDetailPage({
             </div>
 
             <ImageGeneratePanel wordId={resolvedParams.id} />
+
+            <AudioPanel
+                wordId={resolvedParams.id}
+                audioVerified={word.audio_verified}
+                audioVerifiedAt={word.audio_verified_at}
+                locked={!!lockedBy}
+                onChange={(next) =>
+                    setWord((prev) => (prev ? { ...prev, ...next } : prev))
+                }
+            />
 
             {/* Delete (hard) — for unambiguous mistakes only. Decline is the
                 better choice for "this word doesn't belong" since it preserves

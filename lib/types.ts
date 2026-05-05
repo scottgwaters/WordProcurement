@@ -44,6 +44,12 @@ export interface Word {
   verified: boolean;
   verified_at: string | null;
   verified_by: string | null;
+  /** Independent gate for the per-word .wav clip in R2. False on every row
+   *  in the legacy backfill — those rows are "text verified, audio pending"
+   *  until a curator sweeps through audio review. */
+  audio_verified: boolean;
+  audio_verified_at: string | null;
+  audio_verified_by: string | null;
   /** Soft-delete marker. Declined words are hidden from the default queue. */
   declined?: boolean;
   /** Present on list responses — derived from activity_log on the server. */
@@ -57,7 +63,7 @@ export interface ActivityLog {
   id: string;
   word_id: string;
   user_id: string;
-  action: "created" | "verified" | "rejected" | "edited" | "flagged" | "unflagged";
+  action: "created" | "verified" | "rejected" | "edited" | "flagged" | "unflagged" | "audio_verified" | "audio_unverified";
   details: Record<string, unknown> | null;
   created_at: string;
 }
@@ -95,6 +101,8 @@ export interface WordFilters {
   ungraded?: boolean;
   level?: Level;
   verified?: boolean;
+  /** Independent of `verified`: filter on the audio review gate. */
+  audioVerified?: boolean;
   /** True when the "Flagged" status option is selected. Flag state is
    *  computed from activity_log on the server. Mutually exclusive with
    *  `verified` in the UI — selecting "Flagged" clears verified. */

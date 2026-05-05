@@ -14,8 +14,9 @@ model User {
   isAdmin   Boolean  @default(false) @map("is_admin")
   createdAt DateTime @default(now()) @map("created_at")
 
-  words          Word[]         @relation("CreatedBy")
-  verifiedWords  Word[]         @relation("VerifiedBy")
+  words              Word[]        @relation("CreatedBy")
+  verifiedWords      Word[]        @relation("VerifiedBy")
+  audioVerifiedWords Word[]        @relation("AudioVerifiedBy")
   activityLogs   ActivityLog[]
   invitesCreated InviteToken[]  @relation("InvitedBy")
   wordLeases     WordLease[]
@@ -63,6 +64,14 @@ model Word {
   verifiedAt           DateTime? @map("verified_at")
   verifiedById         String?   @map("verified_by")
   verifiedBy           User?     @relation("VerifiedBy", fields: [verifiedById], references: [id])
+  // Independent gate for the per-word audio clip (Kokoro-rendered .wav in R2
+  // at audio/<id>.wav). Decoupled from `verified` because audio review came
+  // online after most rows were already text-verified — those rows correctly
+  // read as "text verified, audio pending" until a curator listens to each.
+  audioVerified        Boolean   @default(false) @map("audio_verified")
+  audioVerifiedAt      DateTime? @map("audio_verified_at")
+  audioVerifiedById    String?   @map("audio_verified_by")
+  audioVerifiedBy      User?     @relation("AudioVerifiedBy", fields: [audioVerifiedById], references: [id])
   // Soft-delete marker for words the reviewers have decided don't belong
   // in the game. Distinct from `verified=false` (pending) — declined words
   // stay out of the review queue and survive re-imports.
@@ -87,6 +96,7 @@ model Word {
   @@index([ageGroup])
   @@index([gradeLevel])
   @@index([verified])
+  @@index([audioVerified])
   @@map("words")
 }
 

@@ -53,6 +53,7 @@ function WordsPageInner() {
     if (filters.ungraded) params.set("ungraded", "true");
     if (filters.level) params.set("level", String(filters.level));
     if (filters.verified !== undefined) params.set("verified", String(filters.verified));
+    if (filters.audioVerified !== undefined) params.set("audioVerified", String(filters.audioVerified));
     if (filters.flagged) params.set("flagged", "true");
     if (filters.declined) params.set("declined", "true");
     if (filters.search) params.set("search", filters.search);
@@ -198,10 +199,21 @@ function WordsPageInner() {
                             >
                               Declined
                             </span>
-                          ) : word.verified ? (
-                            <span className="badge badge-success">Verified</span>
                           ) : (
-                            <span className="badge badge-warning">Pending</span>
+                            <>
+                              <span
+                                className={word.verified ? "badge badge-success" : "badge badge-warning"}
+                                title={word.verified ? "Text content reviewed" : "Text content pending review"}
+                              >
+                                {word.verified ? "Text ✓" : "Text"}
+                              </span>
+                              <span
+                                className={word.audio_verified ? "badge badge-success" : "badge badge-warning"}
+                                title={word.audio_verified ? "Audio clip reviewed" : "Audio clip pending review"}
+                              >
+                                {word.audio_verified ? "Audio ✓" : "Audio"}
+                              </span>
+                            </>
                           )}
                           {word.flagged && (
                             <span

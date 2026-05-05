@@ -87,6 +87,42 @@ export function imageKeyForWord(word: { id: string; category: string }): string 
 }
 
 /**
+ * Build the canonical R2 object key for a word's audio clip. Unlike images,
+ * sight + heart words each get their own clip (the spoken word is unique
+ * even if the illustration is shared).
+ */
+export function audioKeyForWord(word: { id: string }): string {
+    return `audio/${word.id}.wav`;
+}
+
+/**
+ * Server-side PutObject for streaming a binary blob into R2. Used by the
+ * audio bulk-upload endpoint, which receives the .wav body over HTTP and
+ * forwards it to storage in one hop. Returns the full key (including the
+ * STORAGE_KEY_PREFIX) so callers can log it.
+ */
+export async function putObject(
+    key: string,
+    body: Buffer | Uint8Array,
+    contentType: string,
+): Promise<{ full_key: string; bucket: string }> {
+    const bucket = process.env.S3_BUCKET_NAME;
+    const prefix = STORAGE_KEY_PREFIX;
+    if (!bucket) throw new Error("S3_BUCKET_NAME missing from pod env");
+    const fullKey = prefix + key;
+    await makeS3Client().send(
+        new PutObjectCommand({
+            Bucket: bucket,
+            Key: fullKey,
+            Body: body,
+            ContentType: contentType,
+        }),
+    );
+    cache.delete(key);
+    return { full_key: fullKey, bucket };
+}
+
+/**
  * Mint a presigned PUT URL the worker can stream the generated PNG into.
  * The caller (the Python image worker) must `Content-Type: image/png` on
  * the upload — anything else and S3 will sign-mismatch.

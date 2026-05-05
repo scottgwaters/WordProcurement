@@ -64,6 +64,25 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
     router.push(`/words/${id}`);
   };
 
+  const handleVerifyAudio = async (id: string, next: boolean) => {
+    setActing(true);
+    const r = await fetch(`/api/words/${id}/audio/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioVerified: next }),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      onWordChange({
+        ...word,
+        audio_verified: data.audio_verified,
+        audio_verified_at: data.audio_verified_at,
+        audio_verified_by: data.audio_verified_by,
+      });
+    }
+    setActing(false);
+  };
+
   const handleFlag = async (id: string) => {
     setFlagInitialReasons([]);
     setFlagInitialNote("");
@@ -155,6 +174,7 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
             onReject={handleReject}
             onEdit={handleEdit}
             onFlag={handleFlag}
+            onVerifyAudio={handleVerifyAudio}
             onSkip={onClose}
             isLoading={acting}
           />

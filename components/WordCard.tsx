@@ -15,6 +15,10 @@ interface WordCardProps {
   onEdit?: (wordId: string) => void;
   onFlag?: (wordId: string) => void;
   onGenerateImage?: (wordId: string) => void;
+  /** Optional callback fired when the reviewer toggles the audio-verified
+   *  gate. The card surfaces the toggle inline next to the audio player so
+   *  reviewers can approve audio without leaving the card. */
+  onVerifyAudio?: (wordId: string, next: boolean) => void;
   onSkip?: () => void;
   isLoading?: boolean;
 }
@@ -27,6 +31,7 @@ export default function WordCard({
   onEdit,
   onFlag,
   onGenerateImage,
+  onVerifyAudio,
   onSkip,
   isLoading = false,
 }: WordCardProps) {
@@ -107,13 +112,49 @@ export default function WordCard({
             >
               Declined
             </span>
-          ) : word.verified ? (
-            <span className="badge badge-success">Verified</span>
           ) : (
-            <span className="badge badge-warning">Pending</span>
+            <>
+              <span
+                className={word.verified ? "badge badge-success" : "badge badge-warning"}
+                title="Definition, hints, sentence, pronunciation, image"
+              >
+                {word.verified ? "Text Verified" : "Text Pending"}
+              </span>
+              <span
+                className={word.audio_verified ? "badge badge-success" : "badge badge-warning"}
+                title="Per-word audio clip"
+              >
+                {word.audio_verified ? "Audio Verified" : "Audio Pending"}
+              </span>
+            </>
           )}
         </div>
       </div>
+
+      {/* Audio review block — keeps audio approval inline so reviewers don't
+          have to leave the card to flip the audio gate. Hidden when the parent
+          hasn't wired onVerifyAudio (e.g. read-only contexts). */}
+      {onVerifyAudio && (
+        <section className="review-def">
+          <div className="review-section-label">Audio</div>
+          <div className="flex flex-wrap items-center gap-3">
+            <audio
+              controls
+              preload="none"
+              src={`/api/words/${word.id}/audio`}
+              className="flex-1 min-w-[200px]"
+            />
+            <button
+              type="button"
+              onClick={() => onVerifyAudio(word.id, !word.audio_verified)}
+              disabled={isLoading}
+              className={word.audio_verified ? "btn btn-secondary text-sm" : "btn btn-primary text-sm"}
+            >
+              {word.audio_verified ? "Unapprove audio" : "Approve audio"}
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* 1. Definition — the anchor / source of truth */}
       {(word.definition || word.example_sentence) && (

@@ -394,6 +394,31 @@ function BucketReview({
     setActingId(null);
   };
 
+  const handleVerifyAudio = async (id: string, next: boolean) => {
+    setActingId(id);
+    const r = await fetch(`/api/words/${id}/audio/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioVerified: next }),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      setWords((prev) =>
+        prev.map((w) =>
+          w.id === id
+            ? {
+                ...w,
+                audio_verified: data.audio_verified,
+                audio_verified_at: data.audio_verified_at,
+                audio_verified_by: data.audio_verified_by,
+              }
+            : w,
+        ),
+      );
+    }
+    setActingId(null);
+  };
+
   const handleReject = async (id: string) => {
     setActingId(id);
     await fetch(`/api/words/${id}/decline`, {
@@ -626,6 +651,7 @@ function BucketReview({
                 onEdit={handleEdit}
                 onFlag={handleFlag}
                 onGenerateImage={(id) => setImageTargetId(id)}
+                onVerifyAudio={handleVerifyAudio}
                 isLoading={actingId === w.id}
               />
             ))}

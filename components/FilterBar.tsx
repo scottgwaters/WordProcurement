@@ -29,6 +29,7 @@ export default function FilterBar({
     filters.ungraded ||
     filters.level ||
     filters.verified !== undefined ||
+    filters.audioVerified !== undefined ||
     filters.flagged !== undefined ||
     filters.declined !== undefined;
 
@@ -142,11 +143,30 @@ export default function FilterBar({
           className={selectCls}
           aria-label="Filter by verification status"
         >
-          <option value="">All status</option>
-          <option value="pending">Pending</option>
-          <option value="verified">Verified</option>
+          <option value="">All text</option>
+          <option value="pending">Text pending</option>
+          <option value="verified">Text verified</option>
           <option value="flagged">Flagged</option>
           <option value="declined">Declined</option>
+        </select>
+      )}
+
+      {showStatus && (
+        <select
+          value={filters.audioVerified === undefined ? "" : filters.audioVerified ? "verified" : "pending"}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "verified") onChange({ ...filters, audioVerified: true });
+            else if (v === "pending") onChange({ ...filters, audioVerified: false });
+            else onChange({ ...filters, audioVerified: undefined });
+          }}
+          className={selectCls}
+          aria-label="Filter by audio verification status"
+          title="Filter by per-word audio review state"
+        >
+          <option value="">All audio</option>
+          <option value="pending">Audio pending</option>
+          <option value="verified">Audio verified</option>
         </select>
       )}
 

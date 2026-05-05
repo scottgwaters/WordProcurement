@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
   const ungraded = searchParams.get("ungraded") === "true";
   const level = searchParams.get("level");
   const verified = searchParams.get("verified");
+  const audioVerified = searchParams.get("audioVerified");
   const flagged = searchParams.get("flagged");
   const declined = searchParams.get("declined");
   const search = searchParams.get("search");
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
     gradeLevel?: string | null;
     level?: number;
     verified?: boolean;
+    audioVerified?: boolean;
     declined?: boolean;
     word?: { contains: string };
     id?: { in?: string[]; notIn?: string[] };
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
   }
   if (level) where.level = parseInt(level);
   if (verified !== null) where.verified = verified === "true";
+  if (audioVerified !== null) where.audioVerified = audioVerified === "true";
   if (search) where.word = { contains: search };
 
   // Declined words are hidden by default so the normal review/listing
@@ -128,6 +131,9 @@ export async function GET(request: NextRequest) {
     verified: w.verified,
     verified_at: w.verifiedAt,
     verified_by: w.verifiedById,
+    audio_verified: w.audioVerified,
+    audio_verified_at: w.audioVerifiedAt,
+    audio_verified_by: w.audioVerifiedById,
     created_at: w.createdAt,
     created_by: w.createdById,
     source: w.source,
@@ -229,6 +235,9 @@ export async function POST(request: NextRequest) {
     verified: newWord.verified,
     verified_at: newWord.verifiedAt,
     verified_by: newWord.verifiedById,
+    audio_verified: newWord.audioVerified,
+    audio_verified_at: newWord.audioVerifiedAt,
+    audio_verified_by: newWord.audioVerifiedById,
     created_at: newWord.createdAt,
     created_by: newWord.createdById,
     source: newWord.source,
