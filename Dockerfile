@@ -1,5 +1,11 @@
 FROM node:20-slim
 
+# Build-time arg used purely to bust Dailey's registry layer dedupe when a
+# previous failed push has poisoned the :HEAD / :latest tags with a stale
+# image. Pass --build-arg BUILD_REV=<sha> to force a unique image hash.
+ARG BUILD_REV=2026-05-05T22:05Z
+ENV BUILD_REV=$BUILD_REV
+
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
