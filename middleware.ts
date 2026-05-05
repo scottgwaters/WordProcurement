@@ -25,6 +25,13 @@ export default auth((req) => {
   // presigned URL is itself short-lived and unguessable.
   const isWordImageApi =
     /^\/api\/words\/[^/]+\/image$/.test(pathname);
+  // Per-(word, tier) hint audio redirect — public so the WP review UI and
+  // (eventually) the iOS app can play hints with a plain <audio> tag.
+  const isHintAudioApi =
+    /^\/api\/words\/[^/]+\/hints\/(easy|medium|hard)$/.test(pathname);
+  // Hint audio bulk upload — bearer-authed, same token pair as /api/import.
+  const isHintAudioUploadApi =
+    /^\/api\/words\/[^/]+\/hints\/(easy|medium|hard)\/upload$/.test(pathname);
   // Public read of the verified word catalog — the iOS app fetches this on
   // launch to pick up newly approved words without requiring an app update.
   // Filtered to verified + non-declined inside the handler, no PII present.
@@ -44,7 +51,7 @@ export default auth((req) => {
   // token (defense-in-depth alongside route handler check). The storage-test
   // endpoint is a developer diagnostic that needs to be curl-able from
   // outside a browser session.
-  if (isImportApi || isStorageTestApi || isDeclineApi || isImageWorkerApi) {
+  if (isImportApi || isStorageTestApi || isDeclineApi || isImageWorkerApi || isHintAudioUploadApi) {
     const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     // Accept either token name. Two values exist on the project (one
     // legacy, one the curator set locally); both are the same trust level
@@ -72,6 +79,11 @@ export default auth((req) => {
 
   // Allow public image redirects (no auth — iOS app needs them).
   if (isWordImageApi) {
+    return NextResponse.next();
+  }
+
+  // Allow public hint audio redirects (per-tier hint clips).
+  if (isHintAudioApi) {
     return NextResponse.next();
   }
 

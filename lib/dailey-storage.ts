@@ -96,6 +96,15 @@ export function audioKeyForWord(word: { id: string }): string {
 }
 
 /**
+ * R2 key for a hint clip. One file per (word, tier) — overwritten on rewrite,
+ * so the URL stays stable even when the hint text changes.
+ */
+export type HintTier = "easy" | "medium" | "hard";
+export function hintAudioKeyForWord(wordId: string, tier: HintTier): string {
+    return `audio/hints/${wordId}_${tier}.wav`;
+}
+
+/**
  * Server-side PutObject for streaming a binary blob into R2. Used by the
  * audio bulk-upload endpoint, which receives the .wav body over HTTP and
  * forwards it to storage in one hop. Returns the full key (including the

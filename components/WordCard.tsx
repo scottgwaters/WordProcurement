@@ -3,6 +3,7 @@
 import type { Word } from "@/lib/types";
 import { worldForCategory } from "@/lib/worlds";
 import GradeBadge from "@/components/GradeBadge";
+import HintPlayButton from "@/components/HintPlayButton";
 import ImageLightbox from "@/components/ImageLightbox";
 import Link from "next/link";
 import { useState } from "react";
@@ -208,16 +209,19 @@ export default function WordCard({
               <span className="review-hints__num">1</span>
               <span className="review-hints__pill">Easy</span>
               <span className="review-hints__text">{word.hints.easy}</span>
+              <HintPlayButton wordId={word.id} tier="easy" />
             </li>
             <li className="review-hints__row" data-tier="medium">
               <span className="review-hints__num">2</span>
               <span className="review-hints__pill">Medium</span>
               <span className="review-hints__text">{word.hints.medium}</span>
+              <HintPlayButton wordId={word.id} tier="medium" />
             </li>
             <li className="review-hints__row" data-tier="hard">
               <span className="review-hints__num">3</span>
               <span className="review-hints__pill">Hard</span>
               <span className="review-hints__text">{word.hints.hard}</span>
+              <HintPlayButton wordId={word.id} tier="hard" />
             </li>
           </ol>
         </section>
