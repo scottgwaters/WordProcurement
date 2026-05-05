@@ -756,234 +756,193 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   backdrop-filter: saturate(180%) blur(8px);
 }
 
-/* ===== Bucket picker table =========================================== */
+/* ===== Bucket picker — grade cards ==================================== */
 
-.bucket-card {
+.grade-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .grade-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .grade-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.grade-card {
   background: var(--bg-primary);
-  border: 1px solid var(--border-light);
+  border: 1px solid #e2e8f0;     /* slate-200 */
   border-radius: 14px;
-  box-shadow: var(--shadow-md);
-  padding: 8px;
+  padding: 16px 16px 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* "All Grades Total" card — same shape, gentle gradient so it reads as a
+   summary without overpowering the per-grade cards. */
+.grade-card--total {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--approve) 7%, var(--bg-primary)) 0%,
+    var(--bg-primary) 100%
+  );
+  border-color: color-mix(in srgb, var(--approve) 25%, #e2e8f0);
+}
+
+.grade-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef0f3;
+  margin-bottom: 12px;
+}
+
+.grade-card__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.grade-card__emoji {
+  font-size: 24px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.grade-card__label {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.bucket-table-scroll {
-  width: 100%;
-  overflow-x: auto;
-  border-radius: 10px;
-}
-
-.bucket-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+.grade-card__pending {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: #f1f5f9;            /* slate-100 */
+  color: #475569;                 /* slate-600 */
+  border: 1px solid transparent;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-/* Column headers — stacked icon over label, two-line max */
-.bucket-th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--bg-primary);
-  padding: 18px 12px 16px;
-  font-size: 0.78125rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border);
-  vertical-align: bottom;
+.grade-card__pending--link {
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 120ms var(--ease), color 120ms var(--ease);
+}
+.grade-card__pending--link:hover {
+  background: color-mix(in srgb, var(--approve) 14%, #f1f5f9);
+  color: #0f766e;                 /* teal-700 */
+  text-decoration: none;
+}
+.grade-card__pending--link:focus-visible {
+  outline: 2px solid var(--approve);
+  outline-offset: 2px;
 }
 
-.bucket-th--grade {
-  text-align: left;
-  padding-left: 20px;
-  position: sticky;
-  left: 0;
-  z-index: 3;
-  background: var(--bg-primary);
-  min-width: 132px;
-}
-
-.bucket-th--world {
-  text-align: center;
-  min-width: 132px;
-}
-
-.bucket-th--total {
-  text-align: center;
-  background: var(--bg-tertiary);
-  min-width: 92px;
-  border-left: 1px solid var(--border-light);
-}
-
-.bucket-th__stack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.grade-card__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.bucket-th__icon {
-  font-size: 26px;
-  line-height: 1;
+/* World cell — left-aligned icon + name, right-aligned count.
+   Locked to ≥44px tall so it's a comfortable touch target on phones. */
+.world-cell {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: #f8fafc;            /* slate-50 */
+  border: 1px solid #e2e8f0;      /* slate-200 */
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition:
+    background-color 120ms var(--ease),
+    border-color 120ms var(--ease),
+    box-shadow 120ms var(--ease);
 }
 
-.bucket-th__label {
+.world-cell--link:hover {
+  background: var(--bg-primary);
+  border-color: color-mix(in srgb, var(--approve) 35%, #e2e8f0);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  text-decoration: none;
+}
+
+.world-cell--link:focus-visible {
+  outline: 2px solid var(--approve);
+  outline-offset: 2px;
+}
+
+.world-cell__icon {
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.world-cell__name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.25;
+  /* Allow up to two lines for long world names like "Around the House" so
+     the count stays right-aligned without overlapping. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  max-width: 14ch;
-  text-align: center;
-  line-height: 1.25;
-  color: var(--text-primary);
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
+  word-break: break-word;
 }
 
-/* Row head — sticky on horizontal scroll so reviewers always see the grade */
-.bucket-row-head {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  background: var(--bg-primary);
-  text-align: left;
-  padding: 14px 16px 14px 20px;
-  border-bottom: 1px solid var(--border-light);
-  font-weight: 500;
-  vertical-align: middle;
-  min-width: 132px;
-}
-
-.bucket-row-head--total {
-  background: var(--bg-tertiary);
+.world-cell__count {
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.8125rem;
-  border-top: 2px solid var(--border);
+  color: #0f766e;                 /* teal-700 — active count */
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  flex: 0 0 auto;
 }
 
-/* Data cells */
-.bucket-td {
-  padding: 0;
-  text-align: center;
-  border-bottom: 1px solid var(--border-light);
-  vertical-align: middle;
-}
-
-.bucket-td--total-col {
-  background: var(--bg-tertiary);
-  border-left: 1px solid var(--border-light);
-}
-
-.bucket-totals-row .bucket-td {
-  background: var(--bg-tertiary);
-  border-top: 2px solid var(--border);
-  border-bottom: none;
-}
-
-.bucket-td--grand {
-  background: color-mix(in srgb, var(--accent-soft) 35%, var(--bg-tertiary));
-  border-left: 1px solid var(--border-light);
-}
-
-/* Zebra row tint — every other data row gets a subtle warm wash */
-.bucket-table tbody tr:nth-child(even) > .bucket-td:not(.bucket-td--total-col):not(.bucket-td--total-row),
-.bucket-table tbody tr:nth-child(even) > .bucket-row-head:not(.bucket-row-head--total) {
-  background: #fafbfa;
-}
-
-/* Cell content — link or label */
-.bucket-cell-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 64px;
-  padding: 10px 8px;
-  text-decoration: none;
-  color: var(--text-primary);
-  border-radius: 8px;
-  margin: 4px;
-  transition:
-    background-color 120ms var(--ease),
-    box-shadow 120ms var(--ease),
-    transform 120ms var(--ease),
-    border-color 120ms var(--ease);
-  border: 1px solid transparent;
-}
-
-.bucket-cell-wrap--static {
+.world-cell--empty {
   cursor: default;
 }
 
-.bucket-cell-wrap:not(.bucket-cell-wrap--static):hover {
-  background: var(--bg-primary);
-  border-color: var(--accent-soft);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-  transform: translateY(-1px);
-  text-decoration: none;
+.world-cell--empty .world-cell__name {
+  color: #94a3b8;                 /* slate-400 */
 }
 
-.bucket-cell-wrap:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.world-cell--empty .world-cell__count {
+  color: #cbd5e1;                 /* slate-300 — em-dash */
+  font-weight: 600;
 }
 
-.bucket-cell {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 6px 10px;
-  border-radius: 6px;
-  /* Heat-map tint — opacity scales with --heat (0..1). Uses ocean-teal so
-     dense buckets read warm-cool against the slate header chrome. */
-  background: color-mix(
-    in srgb,
-    var(--approve) calc(var(--heat, 0) * 22%),
-    transparent
-  );
-}
-
-.bucket-cell[data-heat="on"] {
-  border: 1px solid color-mix(
-    in srgb,
-    var(--approve) calc(var(--heat, 0) * 35%),
-    transparent
-  );
-}
-
-.bucket-cell__num {
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
-}
-
-.bucket-cell--strong .bucket-cell__num {
-  font-weight: 800;
-  color: var(--accent-active);
-}
-
-.bucket-cell--empty {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 64px;
-  width: 100%;
-  color: var(--text-tertiary);
-  font-size: 1.125rem;
-  font-weight: 500;
-}
-
-/* Last row — drop the bottom border */
-.bucket-table tbody tr:last-child .bucket-td,
-.bucket-table tbody tr:last-child .bucket-row-head {
-  border-bottom: none;
+@media (max-width: 374px) {
+  /* On the smallest phones (iPhone SE @ 375 minus chrome), drop to one
+     column inside each card so the cell stays comfortable to tap. */
+  .grade-card__grid { grid-template-columns: 1fr; }
 }
 
 /* ===========================================================================
@@ -1617,21 +1576,6 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
     min-width: 0;
     padding: 10px 8px;
   }
-}
-
-/* ---------- Bucket picker table — let it scroll horizontally on small screens ---------- */
-
-@media (max-width: 767px) {
-  .bucket-card { padding: 4px; }
-  .bucket-cell-wrap { min-height: 56px; }
-  .bucket-cell__num { font-size: 1.0625rem; }
-  .bucket-th { padding: 12px 8px; }
-  .bucket-th--world,
-  .bucket-th--grade,
-  .bucket-th--total { min-width: 100px; }
-  .bucket-th__icon { font-size: 22px; }
-  .bucket-th__label { font-size: 0.75rem; }
-  .bucket-row-head { padding: 12px; min-width: 100px; }
 }
 
 /* ---------- Edit page topbar + save status ---------- */

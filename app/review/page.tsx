@@ -27,6 +27,18 @@ const WORLD_ORDER: WorldId[] = [
   "animals", "food", "nature", "space", "objects", "magic", "sight", "feelings",
 ];
 
+// Card-view grade display: emoji + label. Kept here (not in GradeBadge) so the
+// picker reads as a friendly card without pulling the colored image-icon pill.
+const GRADE_CARD: Record<GradeLevel | "ungraded" | "total", { emoji: string; label: string }> = {
+  k:        { emoji: "🐰", label: "Kindergarten" },
+  "1":      { emoji: "🦊", label: "1st Grade" },
+  "2":      { emoji: "🦌", label: "2nd Grade" },
+  "3":      { emoji: "🦉", label: "3rd Grade" },
+  "4":      { emoji: "🐻", label: "4th Grade" },
+  ungraded: { emoji: "⚠️", label: "Ungraded" },
+  total:    { emoji: "🏆", label: "All Grades Total" },
+};
+
 export default function ReviewPage() {
   return (
     <Suspense fallback={null}>
@@ -93,20 +105,18 @@ function BucketPicker() {
     return () => { cancelled = true; };
   }, []);
 
-  // Highest data-cell value (excluding totals) — drives the heat-map intensity
-  // so the busiest bucket reaches full saturation and quiet buckets fade.
-  const visibleGradeRows = GRADE_ROWS.filter((g) => {
+  // Per-world totals across all grades, plus the grand total. Ungraded only
+  // counts when it has pending words — once curation is complete that row
+  // disappears from the totals too.
+  const includedGradeRows = GRADE_ROWS.filter((g) => {
     if (g !== "ungraded") return true;
     const t = WORLD_ORDER.reduce((s, w) => s + (matrix?.[g]?.[w] ?? 0), 0);
     return t > 0;
   });
-  const maxCellValue = visibleGradeRows.reduce((m, g) => {
-    return WORLD_ORDER.reduce((mm, w) => Math.max(mm, matrix?.[g]?.[w] ?? 0), m);
-  }, 0);
-
   const colTotals: Record<WorldId, number> = WORLD_ORDER.reduce((acc, wid) => {
-    acc[wid] = visibleGradeRows.reduce(
-      (s, g) => s + (matrix?.[g]?.[wid] ?? 0), 0,
+    acc[wid] = includedGradeRows.reduce(
+      (s, g) => s + (matrix?.[g]?.[wid] ?? 0),
+      0,
     );
     return acc;
   }, {} as Record<WorldId, number>);
@@ -132,116 +142,47 @@ function BucketPicker() {
             <p className="text-[var(--text-secondary)]">Loading buckets...</p>
           </div>
         ) : (
-          <div className="bucket-card">
-            <div className="bucket-table-scroll">
-              <table className="bucket-table">
-                <thead>
-                  <tr>
-                    <th scope="col" className="bucket-th bucket-th--grade">
-                      Grade
-                    </th>
-                    {WORLD_ORDER.map((wid) => (
-                      <th
-                        key={wid}
-                        scope="col"
-                        className="bucket-th bucket-th--world"
-                      >
-                        <div className="bucket-th__stack">
-                          <span
-                            className="bucket-th__icon"
-                            aria-hidden="true"
-                          >
-                            {WORLDS[wid].emoji}
-                          </span>
-                          <span className="bucket-th__label">
-                            {WORLDS[wid].name}
-                          </span>
-                        </div>
-                      </th>
-                    ))}
-                    <th scope="col" className="bucket-th bucket-th--total">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {GRADE_ROWS.map((g) => {
-                    const row = matrix?.[g] ?? {} as Record<WorldId, number>;
-                    const rowTotal = WORLD_ORDER.reduce(
-                      (s, w) => s + (row[w] ?? 0), 0,
-                    );
-                    // Hide ungraded row when empty — once corpus is fully
-                    // graded this row should disappear entirely.
-                    if (g === "ungraded" && rowTotal === 0) return null;
-                    const wordsHref =
-                      g === "ungraded"
-                        ? `/words?ungraded=true&verified=false`
-                        : `/words?gradeLevel=${g}&verified=false`;
-                    return (
-                      <tr key={g}>
-                        <th
-                          scope="row"
-                          className="bucket-row-head"
-                        >
-                          {g === "ungraded" ? (
-                            <span className="badge badge-warning">⚠ Ungraded</span>
-                          ) : (
-                            <GradeBadge value={g} size="md" />
-                          )}
-                        </th>
-                        {WORLD_ORDER.map((wid) => {
-                          const count = row[wid] ?? 0;
-                          return (
-                            <td key={wid} className="bucket-td">
-                              <BucketCell
-                                count={count}
-                                href={`/review?gradeLevel=${g}&world=${wid}`}
-                                heat={maxCellValue ? count / maxCellValue : 0}
-                                ariaLabel={`${count} pending words in ${WORLDS[wid].name} for ${GRADE_ROW_LABEL(g)}`}
-                              />
-                            </td>
-                          );
-                        })}
-                        <td className="bucket-td bucket-td--total-col">
-                          <BucketCell
-                            count={rowTotal}
-                            href={wordsHref}
-                            strong
-                            asLink={rowTotal > 0}
-                            ariaLabel={`${rowTotal} pending words for ${GRADE_ROW_LABEL(g)} across all worlds`}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  <tr className="bucket-totals-row">
-                    <th scope="row" className="bucket-row-head bucket-row-head--total">
-                      Total
-                    </th>
-                    {WORLD_ORDER.map((wid) => (
-                      <td key={wid} className="bucket-td bucket-td--total-row">
-                        <BucketCell
-                          count={colTotals[wid]}
-                          href={`/words?world=${wid}&verified=false`}
-                          strong
-                          asLink={colTotals[wid] > 0}
-                          ariaLabel={`${colTotals[wid]} pending words in ${WORLDS[wid].name} across all grades`}
-                        />
-                      </td>
-                    ))}
-                    <td className="bucket-td bucket-td--total-row bucket-td--grand">
-                      <BucketCell
-                        count={grandTotal}
-                        href="/words?verified=false"
-                        strong
-                        asLink
-                        ariaLabel={`${grandTotal} pending words across all buckets`}
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          <div className="grade-card-grid">
+            {GRADE_ROWS.map((g) => {
+              const row = matrix?.[g] ?? ({} as Record<WorldId, number>);
+              const rowTotal = WORLD_ORDER.reduce((s, w) => s + (row[w] ?? 0), 0);
+              // Hide ungraded card when empty — once corpus is fully
+              // graded this row should disappear entirely.
+              if (g === "ungraded" && rowTotal === 0) return null;
+              const totalHref =
+                g === "ungraded"
+                  ? `/words?ungraded=true&verified=false`
+                  : `/words?gradeLevel=${g}&verified=false`;
+              const card = GRADE_CARD[g];
+              return (
+                <GradeBucketCard
+                  key={g}
+                  emoji={card.emoji}
+                  label={card.label}
+                  pendingTotal={rowTotal}
+                  pendingHref={totalHref}
+                  pendingAriaLabel={`${rowTotal} pending words for ${GRADE_ROW_LABEL(g)} across all worlds`}
+                  cellHrefBuilder={(wid) => `/review?gradeLevel=${g}&world=${wid}`}
+                  cellAriaBuilder={(wid, count) =>
+                    `${count} pending words in ${WORLDS[wid].name} for ${GRADE_ROW_LABEL(g)}`
+                  }
+                  counts={row}
+                />
+              );
+            })}
+            <GradeBucketCard
+              emoji={GRADE_CARD.total.emoji}
+              label={GRADE_CARD.total.label}
+              pendingTotal={grandTotal}
+              pendingHref="/words?verified=false"
+              pendingAriaLabel={`${grandTotal} pending words across all buckets`}
+              cellHrefBuilder={(wid) => `/words?world=${wid}&verified=false`}
+              cellAriaBuilder={(wid, count) =>
+                `${count} pending words in ${WORLDS[wid].name} across all grades`
+              }
+              counts={colTotals}
+              tone="total"
+            />
           </div>
         )}
       </main>
@@ -249,52 +190,91 @@ function BucketPicker() {
   );
 }
 
-function BucketCell({
-  count,
-  href,
-  strong,
-  asLink = true,
-  heat = 0,
-  ariaLabel,
+// Single grade card: header (emoji + label + pending pill) over a 2-col grid
+// of world cells. A non-zero count renders as a teal-accented link; a zero
+// count is an inert em-dash. Used for both per-grade and "All Grades Total"
+// cards — `tone="total"` swaps in the gradient background.
+function GradeBucketCard({
+  emoji,
+  label,
+  pendingTotal,
+  pendingHref,
+  pendingAriaLabel,
+  cellHrefBuilder,
+  cellAriaBuilder,
+  counts,
+  tone = "default",
 }: {
-  count: number;
-  href: string;
-  strong?: boolean;
-  asLink?: boolean;
-  heat?: number;
-  ariaLabel?: string;
+  emoji: string;
+  label: string;
+  pendingTotal: number;
+  pendingHref: string;
+  pendingAriaLabel: string;
+  cellHrefBuilder: (wid: WorldId) => string;
+  cellAriaBuilder: (wid: WorldId, count: number) => string;
+  counts: Record<WorldId, number>;
+  tone?: "default" | "total";
 }) {
-  if (count === 0) {
-    return (
-      <span className="bucket-cell bucket-cell--empty" aria-label={ariaLabel}>
-        —
-      </span>
-    );
-  }
-  const label = (
-    <span
-      className={`bucket-cell ${strong ? "bucket-cell--strong" : ""}`}
-      style={heat > 0 ? { ["--heat" as string]: heat.toFixed(3) } : undefined}
-      data-heat={heat > 0 ? "on" : undefined}
-    >
-      <span className="bucket-cell__num">{count.toLocaleString()}</span>
-    </span>
-  );
-  if (!asLink) {
-    return (
-      <span aria-label={ariaLabel} className="bucket-cell-wrap bucket-cell-wrap--static">
-        {label}
-      </span>
-    );
-  }
+  const pendingLabel = `${pendingTotal.toLocaleString()} pending`;
   return (
-    <Link
-      href={href}
-      aria-label={ariaLabel}
-      className="bucket-cell-wrap"
+    <section
+      className={`grade-card ${tone === "total" ? "grade-card--total" : ""}`}
+      aria-label={`${label} review bucket`}
     >
-      {label}
-    </Link>
+      <header className="grade-card__head">
+        <div className="grade-card__title">
+          <span className="grade-card__emoji" aria-hidden>{emoji}</span>
+          <span className="grade-card__label">{label}</span>
+        </div>
+        {pendingTotal > 0 ? (
+          <Link
+            href={pendingHref}
+            aria-label={pendingAriaLabel}
+            className="grade-card__pending grade-card__pending--link"
+          >
+            {pendingLabel}
+          </Link>
+        ) : (
+          <span
+            aria-label={pendingAriaLabel}
+            className="grade-card__pending"
+          >
+            {pendingLabel}
+          </span>
+        )}
+      </header>
+      <div className="grade-card__grid">
+        {WORLD_ORDER.map((wid) => {
+          const count = counts[wid] ?? 0;
+          const world = WORLDS[wid];
+          if (count === 0) {
+            return (
+              <span
+                key={wid}
+                className="world-cell world-cell--empty"
+                aria-label={cellAriaBuilder(wid, 0)}
+              >
+                <span className="world-cell__icon" aria-hidden>{world.emoji}</span>
+                <span className="world-cell__name">{world.name}</span>
+                <span className="world-cell__count" aria-hidden>—</span>
+              </span>
+            );
+          }
+          return (
+            <Link
+              key={wid}
+              href={cellHrefBuilder(wid)}
+              aria-label={cellAriaBuilder(wid, count)}
+              className="world-cell world-cell--link"
+            >
+              <span className="world-cell__icon" aria-hidden>{world.emoji}</span>
+              <span className="world-cell__name">{world.name}</span>
+              <span className="world-cell__count">{count.toLocaleString()}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
