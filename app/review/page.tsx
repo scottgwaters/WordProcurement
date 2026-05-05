@@ -11,6 +11,7 @@ import { GRADE_LEVELS, GRADE_LEVEL_LABEL } from "@/lib/types";
 import GradeBadge from "@/components/GradeBadge";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { WORLDS, type WorldId } from "@/lib/worlds";
 
 const GRADE_ROW_LABEL = (g: GradeLevel | "ungraded") =>
@@ -27,14 +28,18 @@ const WORLD_ORDER: WorldId[] = [
   "animals", "food", "nature", "space", "objects", "magic", "sight", "feelings",
 ];
 
-// Card-view grade display: emoji + label. Kept here (not in GradeBadge) so the
-// picker reads as a friendly card without pulling the colored image-icon pill.
-const GRADE_CARD: Record<GradeLevel | "ungraded" | "total", { emoji: string; label: string }> = {
-  k:        { emoji: "🐰", label: "Kindergarten" },
-  "1":      { emoji: "🦊", label: "1st Grade" },
-  "2":      { emoji: "🦌", label: "2nd Grade" },
-  "3":      { emoji: "🦉", label: "3rd Grade" },
-  "4":      { emoji: "🐻", label: "4th Grade" },
+// Card-view grade display: PNG icon + label. The PNGs match the GradeBadge
+// pill icons used elsewhere so reviewers see the same critter throughout the
+// app. `emoji` is a fallback used by the Ungraded / Total cards only.
+const GRADE_CARD: Record<
+  GradeLevel | "ungraded" | "total",
+  { icon?: string; emoji?: string; label: string }
+> = {
+  k:        { icon: "/grade-icons/bunny.png", label: "Kindergarten" },
+  "1":      { icon: "/grade-icons/fox.png",   label: "1st Grade" },
+  "2":      { icon: "/grade-icons/deer.png",  label: "2nd Grade" },
+  "3":      { icon: "/grade-icons/owl.png",   label: "3rd Grade" },
+  "4":      { icon: "/grade-icons/bear.png",  label: "4th Grade" },
   ungraded: { emoji: "⚠️", label: "Ungraded" },
   total:    { emoji: "🏆", label: "All Grades Total" },
 };
@@ -125,7 +130,7 @@ function BucketPicker() {
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="page-container" style={{ maxWidth: "1280px" }}>
+      <main className="bucket-picker-main">
         <header className="mb-6 sm:mb-10">
           <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-[var(--text-primary)]">
             Pick a Review Bucket
@@ -157,6 +162,7 @@ function BucketPicker() {
               return (
                 <GradeBucketCard
                   key={g}
+                  icon={card.icon}
                   emoji={card.emoji}
                   label={card.label}
                   pendingTotal={rowTotal}
@@ -195,6 +201,7 @@ function BucketPicker() {
 // count is an inert em-dash. Used for both per-grade and "All Grades Total"
 // cards — `tone="total"` swaps in the gradient background.
 function GradeBucketCard({
+  icon,
   emoji,
   label,
   pendingTotal,
@@ -205,7 +212,8 @@ function GradeBucketCard({
   counts,
   tone = "default",
 }: {
-  emoji: string;
+  icon?: string;
+  emoji?: string;
   label: string;
   pendingTotal: number;
   pendingHref: string;
@@ -223,7 +231,18 @@ function GradeBucketCard({
     >
       <header className="grade-card__head">
         <div className="grade-card__title">
-          <span className="grade-card__emoji" aria-hidden>{emoji}</span>
+          {icon ? (
+            <Image
+              src={icon}
+              alt=""
+              width={36}
+              height={36}
+              className="grade-card__icon"
+              aria-hidden="true"
+            />
+          ) : (
+            <span className="grade-card__emoji" aria-hidden>{emoji}</span>
+          )}
           <span className="grade-card__label">{label}</span>
         </div>
         {pendingTotal > 0 ? (
