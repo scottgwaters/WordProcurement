@@ -49,7 +49,7 @@ export default function ImageGenerateModal({ wordId, word, onClose }: Props) {
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
-        <ImageGeneratePanel wordId={wordId} />
+        <ImageGeneratePanel wordId={wordId} onJobQueued={onClose} />
       </div>
     </div>
   );

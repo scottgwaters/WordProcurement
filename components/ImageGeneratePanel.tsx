@@ -29,7 +29,16 @@ const STYLE_OPTIONS = [
   { value: "soft3d", label: "Soft 3D · plush toy" },
 ];
 
-export default function ImageGeneratePanel({ wordId }: { wordId: string }) {
+export default function ImageGeneratePanel({
+  wordId,
+  onJobQueued,
+}: {
+  wordId: string;
+  // Optional callback fired right after a generate request is accepted by
+  // the server. The modal flow uses this to dismiss itself — once the job
+  // is queued there's nothing else for the curator to do here.
+  onJobQueued?: () => void;
+}) {
   const [job, setJob] = useState<ImageJob | null>(null);
   const [promptNote, setPromptNote] = useState("");
   const [style, setStyle] = useState("");
@@ -92,6 +101,7 @@ export default function ImageGeneratePanel({ wordId }: { wordId: string }) {
     }
     const data = await res.json();
     setJob(data.job);
+    onJobQueued?.();
   };
 
   const inFlight = job?.status === "pending" || job?.status === "claimed";
