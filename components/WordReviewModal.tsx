@@ -33,15 +33,35 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
     return () => window.removeEventListener("keydown", handler);
   }, [onClose, flagTargetId]);
 
+  // Approve covers both gates (text + audio) in one action — server endpoints
+  // are idempotent, so re-approving an already-verified row is harmless.
   const handleVerify = async (id: string) => {
     setActing(true);
-    const r = await fetch(`/api/words/${id}/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ verified: true }),
-    });
-    if (r.ok) {
-      onWordChange({ ...word, verified: true, declined: false });
+    const [textRes, audioRes] = await Promise.all([
+      fetch(`/api/words/${id}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verified: true }),
+      }),
+      fetch(`/api/words/${id}/audio/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioVerified: true }),
+      }),
+    ]);
+    const audioData = audioRes.ok ? await audioRes.json() : null;
+    if (textRes.ok || audioRes.ok) {
+      onWordChange({
+        ...word,
+        ...(textRes.ok ? { verified: true, declined: false } : {}),
+        ...(audioData
+          ? {
+              audio_verified: audioData.audio_verified,
+              audio_verified_at: audioData.audio_verified_at,
+              audio_verified_by: audioData.audio_verified_by,
+            }
+          : {}),
+      });
       onClose();
       return;
     }
@@ -62,25 +82,6 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
   const handleEdit = (id: string) => {
     onClose();
     router.push(`/words/${id}`);
-  };
-
-  const handleVerifyAudio = async (id: string, next: boolean) => {
-    setActing(true);
-    const r = await fetch(`/api/words/${id}/audio/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioVerified: next }),
-    });
-    if (r.ok) {
-      const data = await r.json();
-      onWordChange({
-        ...word,
-        audio_verified: data.audio_verified,
-        audio_verified_at: data.audio_verified_at,
-        audio_verified_by: data.audio_verified_by,
-      });
-    }
-    setActing(false);
   };
 
   const handleFlag = async (id: string) => {
@@ -174,7 +175,6 @@ export default function WordReviewModal({ word, onClose, onWordChange }: Props) 
             onReject={handleReject}
             onEdit={handleEdit}
             onFlag={handleFlag}
-            onVerifyAudio={handleVerifyAudio}
             onSkip={onClose}
             isLoading={acting}
           />

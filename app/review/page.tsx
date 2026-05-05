@@ -375,45 +375,41 @@ function BucketReview({
     return () => { cancelled = true; };
   }, [gradeRow, world]);
 
+  // One Approve action covers both gates: verify the text and the audio in
+  // parallel. Both endpoints are idempotent, so re-approving an already-
+  // verified row is harmless — the reviewer doesn't need to track which
+  // gates are still open.
   const handleVerify = async (id: string) => {
     setActingId(id);
-    const r = await fetch(`/api/words/${id}/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ verified: true }),
-    });
-    if (r.ok) {
-      // Mark in place — keep the row visible so reviewer sees their action
-      // and can undo by toggling back, but it drops out of "still pending".
+    const [textRes, audioRes] = await Promise.all([
+      fetch(`/api/words/${id}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verified: true }),
+      }),
+      fetch(`/api/words/${id}/audio/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioVerified: true }),
+      }),
+    ]);
+    const audioData = audioRes.ok ? await audioRes.json() : null;
+    if (textRes.ok || audioRes.ok) {
       setWords((prev) =>
-        prev.map((w) =>
-          w.id === id ? { ...w, verified: true, declined: false } : w,
-        ),
-      );
-    }
-    setActingId(null);
-  };
-
-  const handleVerifyAudio = async (id: string, next: boolean) => {
-    setActingId(id);
-    const r = await fetch(`/api/words/${id}/audio/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioVerified: next }),
-    });
-    if (r.ok) {
-      const data = await r.json();
-      setWords((prev) =>
-        prev.map((w) =>
-          w.id === id
-            ? {
-                ...w,
-                audio_verified: data.audio_verified,
-                audio_verified_at: data.audio_verified_at,
-                audio_verified_by: data.audio_verified_by,
-              }
-            : w,
-        ),
+        prev.map((w) => {
+          if (w.id !== id) return w;
+          return {
+            ...w,
+            ...(textRes.ok ? { verified: true, declined: false } : {}),
+            ...(audioData
+              ? {
+                  audio_verified: audioData.audio_verified,
+                  audio_verified_at: audioData.audio_verified_at,
+                  audio_verified_by: audioData.audio_verified_by,
+                }
+              : {}),
+          };
+        }),
       );
     }
     setActingId(null);
@@ -651,7 +647,6 @@ function BucketReview({
                 onEdit={handleEdit}
                 onFlag={handleFlag}
                 onGenerateImage={(id) => setImageTargetId(id)}
-                onVerifyAudio={handleVerifyAudio}
                 isLoading={actingId === w.id}
               />
             ))}

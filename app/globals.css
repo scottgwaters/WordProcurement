@@ -701,6 +701,34 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
 .review-hints__row[data-tier="medium"] .review-hints__play { color: #6b5a3e; border-color: #dccfb8; }
 .review-hints__row[data-tier="hard"]   .review-hints__play { color: #7a3b4b; border-color: #dcc1c6; }
 
+/* Speaker button next to the word headline. Same shape as the per-hint
+   button, sized up to match the larger headline. */
+.word-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: rgba(255, 255, 255, 0.7);
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.05s ease;
+}
+.word-play:hover:not(:disabled) {
+  background: #fff;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+.word-play:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.word-play:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 /* ===== Grade markers — chromeless icon + label =========================
    Icons are iOS-app-icon-style PNGs with their own rounded corners and
    colored background, and now have transparent canvases (alpha-cropped).
@@ -809,26 +837,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
 
 @media (min-width: 768px) {
   .grade-card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 20px;
-  }
-}
-
-@media (min-width: 1100px) {
-  /* All 6 default grade cards (K, 1, 2, 3, 4, Total) fit on two rows when
-     we go to 3 columns — pleasant rhythm and avoids a lone Total card
-     dangling on its own row. */
-  .grade-card-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1500px) {
-  /* On wide monitors, expand to 4 columns so every card breathes and the
-     viewport isn't half-empty. The Ungraded card (when present) just lands
-     on the second row alongside the Total card without churn. */
-  .grade-card-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -939,6 +948,19 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+/* Card now spans the full row, so let the world cells fan out across the
+   width — all 8 worlds inline on desktop, halfway on tablet. */
+@media (min-width: 768px) {
+  .grade-card__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1100px) {
+  .grade-card__grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
 }
 
 /* World cell — left-aligned icon + name, right-aligned count.

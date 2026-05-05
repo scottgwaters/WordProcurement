@@ -5,6 +5,7 @@ import { worldForCategory } from "@/lib/worlds";
 import GradeBadge from "@/components/GradeBadge";
 import HintPlayButton from "@/components/HintPlayButton";
 import ImageLightbox from "@/components/ImageLightbox";
+import WordPlayButton from "@/components/WordPlayButton";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -16,10 +17,6 @@ interface WordCardProps {
   onEdit?: (wordId: string) => void;
   onFlag?: (wordId: string) => void;
   onGenerateImage?: (wordId: string) => void;
-  /** Optional callback fired when the reviewer toggles the audio-verified
-   *  gate. The card surfaces the toggle inline next to the audio player so
-   *  reviewers can approve audio without leaving the card. */
-  onVerifyAudio?: (wordId: string, next: boolean) => void;
   onSkip?: () => void;
   isLoading?: boolean;
 }
@@ -32,7 +29,6 @@ export default function WordCard({
   onEdit,
   onFlag,
   onGenerateImage,
-  onVerifyAudio,
   onSkip,
   isLoading = false,
 }: WordCardProps) {
@@ -71,12 +67,15 @@ export default function WordCard({
           />
         )}
         <div className="review-card-header__main">
-          <Link
-            href={`/words/${word.id}`}
-            className="word-display word-display--xl hover:text-[var(--accent)] transition-fast"
-          >
-            {word.word}
-          </Link>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              href={`/words/${word.id}`}
+              className="word-display word-display--xl hover:text-[var(--accent)] transition-fast"
+            >
+              {word.word}
+            </Link>
+            <WordPlayButton wordId={word.id} />
+          </div>
           <div className="flex flex-wrap items-center gap-2 mt-2">
             {/* Audience — distinct color per grade */}
             <GradeBadge value={word.grade_level} />
@@ -131,31 +130,6 @@ export default function WordCard({
           )}
         </div>
       </div>
-
-      {/* Audio review block — keeps audio approval inline so reviewers don't
-          have to leave the card to flip the audio gate. Hidden when the parent
-          hasn't wired onVerifyAudio (e.g. read-only contexts). */}
-      {onVerifyAudio && (
-        <section className="review-def">
-          <div className="review-section-label">Audio</div>
-          <div className="flex flex-wrap items-center gap-3">
-            <audio
-              controls
-              preload="none"
-              src={`/api/words/${word.id}/audio`}
-              className="flex-1 min-w-[200px]"
-            />
-            <button
-              type="button"
-              onClick={() => onVerifyAudio(word.id, !word.audio_verified)}
-              disabled={isLoading}
-              className={word.audio_verified ? "btn btn-secondary text-sm" : "btn btn-primary text-sm"}
-            >
-              {word.audio_verified ? "Unapprove audio" : "Approve audio"}
-            </button>
-          </div>
-        </section>
-      )}
 
       {/* 1. Definition — the anchor / source of truth */}
       {(word.definition || word.example_sentence) && (
