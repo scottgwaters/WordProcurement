@@ -849,6 +849,20 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
   flex: 0 0 auto;
 }
 
+/* Mobile-only emoji that visually replaces the PNG icon — the card
+   stylesheet hides one or the other depending on viewport width. */
+.grade-card__emoji--mobile-only {
+  display: none;
+}
+
+.world-cell__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .grade-card__label {
   font-size: 1.125rem;
   font-weight: 700;
@@ -967,6 +981,133 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
 .world-cell--empty .world-cell__count {
   color: #cbd5e1;                 /* slate-300 — em-dash */
   font-weight: 600;
+}
+
+/* ---------- Mobile picker overrides (≤767px) ---------------------------
+   Edge-to-edge cards acting as a vertical stack of horizontal dividers.
+   No radius, no shadow, no left/right border — just slate-200 top/bottom
+   1px lines so the page reads as a continuous list rather than a stack
+   of detached panels (which read tiny and busy on a 360px viewport). */
+@media (max-width: 767px) {
+  .bucket-picker-main {
+    /* Strip the page side padding so cards can run flush to the viewport.
+       The heading inside re-applies its own padding below. */
+    padding-inline: 0;
+  }
+  .bucket-picker-main > header {
+    padding-inline: 16px;
+  }
+
+  .grade-card-grid {
+    gap: 0;
+  }
+
+  .grade-card {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-top: 1px solid #e2e8f0;          /* slate-200 */
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: none;
+    padding: 0;
+  }
+  /* Avoid double-borders between adjacent cards in the stack. */
+  .grade-card + .grade-card {
+    border-top: 0;
+  }
+
+  .grade-card--total {
+    background: linear-gradient(
+      180deg,
+      #f8fafc 0%,                            /* slate-50 */
+      #f1f5f9 100%                           /* slate-100 */
+    );
+    border-color: #e2e8f0;
+  }
+
+  .grade-card__head {
+    padding: 14px 12px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #f1f5f9;       /* slate-100 */
+    padding-bottom: 8px;
+  }
+
+  .grade-card__icon {
+    display: none;                           /* PNG hidden on mobile */
+  }
+
+  .grade-card__emoji--mobile-only {
+    display: inline-block;
+    font-size: 26px;
+    line-height: 1;
+  }
+  .grade-card__emoji {
+    font-size: 26px;
+  }
+
+  .grade-card__label {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;                          /* slate-900 */
+  }
+
+  .grade-card__pending {
+    background: #f1f5f9;                     /* slate-100 */
+    color: #475569;                          /* slate-600 */
+    font-size: 13px;
+    font-weight: 600;
+    padding: 5px 11px;
+  }
+
+  .grade-card__grid {
+    gap: 6px;
+    padding: 0 12px 10px;
+  }
+
+  /* World cells: 56px touch target, slate-50 fill, slate-100 hairline,
+     teal-700 active count, slate-400 em-dash for empties. */
+  .world-cell {
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    padding: 12px 10px;
+    min-height: 56px;
+    border-radius: 12px;
+    background: #f8fafc;                     /* slate-50 */
+    border: 1px solid #f1f5f9;               /* slate-100 */
+    color: #0f172a;
+  }
+
+  .world-cell__icon {
+    font-size: 16px;
+  }
+
+  .world-cell__name {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.15;
+    /* Allow long names ("Around the House") to wrap inside the cell rather
+       than push the count off-screen on a 360px viewport. */
+    -webkit-line-clamp: unset;
+    word-break: break-word;
+    white-space: normal;
+    overflow: visible;
+    display: inline;
+  }
+
+  .world-cell__count {
+    font-size: 20px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .world-cell--link .world-cell__count {
+    color: #0f766e;                          /* teal-700 */
+  }
+  .world-cell--empty .world-cell__count {
+    color: #94a3b8;                          /* slate-400 em-dash */
+  }
+  .world-cell--empty .world-cell__name {
+    color: #0f172a;                          /* keep label readable */
+  }
 }
 
 @media (max-width: 374px) {

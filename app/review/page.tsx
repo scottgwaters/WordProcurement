@@ -28,20 +28,31 @@ const WORLD_ORDER: WorldId[] = [
   "animals", "food", "nature", "space", "objects", "magic", "sight", "feelings",
 ];
 
-// Card-view grade display: PNG icon + label. The PNGs match the GradeBadge
-// pill icons used elsewhere so reviewers see the same critter throughout the
-// app. `emoji` is a fallback used by the Ungraded / Total cards only.
+// Per-card world emoji overrides. The WORLDS catalog uses 🏰 for magic and
+// 💗 for feelings — those scan as "fortress" and "love-letter" respectively
+// in this dense card layout, so we substitute a wand and a green heart.
+// Falls back to the canonical emoji for any world without an override.
+const CARD_WORLD_EMOJI: Partial<Record<WorldId, string>> = {
+  magic: "🪄",
+  feelings: "💚",
+};
+
+// Card-view grade display: PNG icon (desktop) + emoji (mobile) + label. The
+// PNGs match the GradeBadge pill icons used elsewhere; the emoji shows on
+// phones where a colored 36px image takes too much vertical space in a
+// stacked-divider list. `emoji`-only entries (ungraded / total) render the
+// same on every viewport.
 const GRADE_CARD: Record<
   GradeLevel | "ungraded" | "total",
-  { icon?: string; emoji?: string; label: string }
+  { icon?: string; emoji: string; label: string }
 > = {
-  k:        { icon: "/grade-icons/bunny.png", label: "Kindergarten" },
-  "1":      { icon: "/grade-icons/fox.png",   label: "1st Grade" },
-  "2":      { icon: "/grade-icons/deer.png",  label: "2nd Grade" },
-  "3":      { icon: "/grade-icons/owl.png",   label: "3rd Grade" },
-  "4":      { icon: "/grade-icons/bear.png",  label: "4th Grade" },
-  ungraded: { emoji: "⚠️", label: "Ungraded" },
-  total:    { emoji: "🏆", label: "All Grades Total" },
+  k:        { icon: "/grade-icons/bunny.png", emoji: "🐰", label: "Kindergarten" },
+  "1":      { icon: "/grade-icons/fox.png",   emoji: "🦊", label: "1st Grade" },
+  "2":      { icon: "/grade-icons/deer.png",  emoji: "🦌", label: "2nd Grade" },
+  "3":      { icon: "/grade-icons/owl.png",   emoji: "🦉", label: "3rd Grade" },
+  "4":      { icon: "/grade-icons/bear.png",  emoji: "🐻", label: "4th Grade" },
+  ungraded: {                                 emoji: "⚠️", label: "Ungraded" },
+  total:    {                                 emoji: "🏆", label: "All Grades Total" },
 };
 
 export default function ReviewPage() {
@@ -231,7 +242,7 @@ function GradeBucketCard({
     >
       <header className="grade-card__head">
         <div className="grade-card__title">
-          {icon ? (
+          {icon && (
             <Image
               src={icon}
               alt=""
@@ -240,9 +251,16 @@ function GradeBucketCard({
               className="grade-card__icon"
               aria-hidden="true"
             />
-          ) : (
-            <span className="grade-card__emoji" aria-hidden>{emoji}</span>
           )}
+          {/* Emoji is the mobile-only icon when the grade has a PNG (CSS
+              hides one or the other). For ungraded / total cards there's no
+              PNG, so emoji shows on every viewport. */}
+          <span
+            className={`grade-card__emoji ${icon ? "grade-card__emoji--mobile-only" : ""}`}
+            aria-hidden
+          >
+            {emoji}
+          </span>
           <span className="grade-card__label">{label}</span>
         </div>
         {pendingTotal > 0 ? (
@@ -266,6 +284,7 @@ function GradeBucketCard({
         {WORLD_ORDER.map((wid) => {
           const count = counts[wid] ?? 0;
           const world = WORLDS[wid];
+          const cellEmoji = CARD_WORLD_EMOJI[wid] ?? world.emoji;
           if (count === 0) {
             return (
               <span
@@ -273,8 +292,10 @@ function GradeBucketCard({
                 className="world-cell world-cell--empty"
                 aria-label={cellAriaBuilder(wid, 0)}
               >
-                <span className="world-cell__icon" aria-hidden>{world.emoji}</span>
-                <span className="world-cell__name">{world.name}</span>
+                <span className="world-cell__label">
+                  <span className="world-cell__icon" aria-hidden>{cellEmoji}</span>
+                  <span className="world-cell__name">{world.name}</span>
+                </span>
                 <span className="world-cell__count" aria-hidden>—</span>
               </span>
             );
@@ -286,8 +307,10 @@ function GradeBucketCard({
               aria-label={cellAriaBuilder(wid, count)}
               className="world-cell world-cell--link"
             >
-              <span className="world-cell__icon" aria-hidden>{world.emoji}</span>
-              <span className="world-cell__name">{world.name}</span>
+              <span className="world-cell__label">
+                <span className="world-cell__icon" aria-hidden>{cellEmoji}</span>
+                <span className="world-cell__name">{world.name}</span>
+              </span>
               <span className="world-cell__count">{count.toLocaleString()}</span>
             </Link>
           );
